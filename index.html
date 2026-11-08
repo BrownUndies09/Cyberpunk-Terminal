@@ -1,0 +1,1085 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PROTOCOL // GHOST_SHELL</title>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://unpkg.com/three@0.160.0/build/three.module.js"
+  }
+}
+</script>
+
+<style>
+  :root {
+    --bg: #050505;
+    --red: #dc2626;
+    --red-hot: #ff5148;
+    --green: #4ade80;
+    --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; }
+
+  html { background: var(--bg); scroll-behavior: smooth; }
+
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: #fff;
+    font-family: var(--mono);
+    -webkit-font-smoothing: antialiased;
+    min-height: 100vh;
+  }
+
+  body.intro-lock { overflow: hidden; height: 100vh; }
+
+  .sr-only {
+    position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+    overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0;
+  }
+
+  /* ---------- 3D CANVAS (background layer) ---------- */
+  #gl {
+    position: fixed; inset: 0;
+    z-index: 0;
+    pointer-events: none;
+    opacity: 0;
+  }
+  #gl canvas { display: block; width: 100%; height: 100%; }
+
+  /* ---------- LANDING ---------- */
+  .reveal {
+    opacity: 0;
+    visibility: hidden;
+    transform: translateY(8px);
+    transition: opacity .7s ease, transform .7s ease, visibility 0s linear .7s;
+  }
+  body.revealed .reveal {
+    opacity: 1;
+    visibility: visible;
+    transform: none;
+    transition: opacity .7s ease, transform .7s ease, visibility 0s;
+  }
+
+  /* .hero-clone = visual duplicate used by the ENTER outro slice */
+  #hero, .hero-clone {
+    position: relative;
+    z-index: 1;
+    min-height: 100vh;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    text-align: center;
+    padding: 6rem 1.5rem;
+  }
+
+  .eyebrow {
+    font-size: .75rem;
+    letter-spacing: .35em;
+    color: var(--red);
+    text-transform: uppercase;
+    margin-bottom: 1.5rem;
+  }
+
+  h1 {
+    margin: 0;
+    font-family: var(--mono);
+    font-weight: 800;
+    text-transform: uppercase;
+    font-size: clamp(2.6rem, 10.5vw, 10rem);
+    line-height: .9;
+    letter-spacing: -0.07em;
+    color: #fff;
+    text-shadow: 0 0 40px rgba(0,0,0,.8);
+  }
+  body.revealed h1 { animation: titleIn 1s cubic-bezier(.2,.8,.2,1) both; }
+  @keyframes titleIn {
+    0%   { letter-spacing: .08em; filter: blur(8px); opacity: 0; }
+    60%  { filter: blur(0); opacity: 1; }
+    100% { letter-spacing: -0.07em; filter: blur(0); opacity: 1; }
+  }
+
+  .subtitle {
+    margin: 1.75rem 0 2.75rem;
+    font-size: clamp(.9rem, 1.6vw, 1.15rem);
+    color: #a3a3a3;
+    letter-spacing: .08em;
+  }
+
+  .btn {
+    font-family: var(--mono);
+    font-size: .95rem;
+    letter-spacing: .4em;
+    padding: 1rem 2.6rem 1rem 3rem; /* compensate trailing tracking */
+    background: rgba(5,5,5,.6);
+    color: var(--red);
+    border: 1px solid var(--red);
+    cursor: pointer;
+    text-transform: uppercase;
+    transition: background .2s, color .2s, box-shadow .2s;
+  }
+  .btn:hover, .btn:focus-visible {
+    background: var(--red);
+    color: #050505;
+    box-shadow: 0 0 30px rgba(220,38,38,.5);
+  }
+  .btn:focus-visible { outline: 2px solid #fff; outline-offset: 4px; }
+
+  .hdr, .ftr {
+    position: fixed;
+    z-index: 2;
+    font-size: .72rem;
+    letter-spacing: .22em;
+    text-transform: uppercase;
+    color: #d4d4d4;
+    mix-blend-mode: normal;
+  }
+  .hdr { top: 1.5rem; left: 1.75rem; display: flex; align-items: center; gap: .9rem; }
+  .ftr { bottom: 1.5rem; right: 1.75rem; color: #737373; }
+  .dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: var(--red);
+    box-shadow: 0 0 10px var(--red);
+    animation: pulse 1.4s ease-in-out infinite;
+  }
+  @keyframes pulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: .25; transform: scale(.7); }
+  }
+
+  #content {
+    position: relative;
+    z-index: 1;
+    min-height: 100vh;
+    display: flex; align-items: center; justify-content: center;
+    border-top: 1px solid rgba(220,38,38,.35);
+    background: rgba(5,5,5,.55);
+    color: #a3a3a3;
+    font-size: 1.1rem;
+    letter-spacing: .1em;
+  }
+
+  /* ---------- TERMINAL OVERLAY ---------- */
+  #terminal {
+    position: fixed; inset: 0;
+    z-index: 100;
+    background: var(--bg);
+    color: var(--green);
+    font-family: var(--mono);
+    padding: clamp(1.25rem, 5vw, 4rem);
+    display: flex; align-items: flex-start; justify-content: flex-start;
+    overflow: hidden;
+    transition: opacity .6s ease;
+  }
+  #terminal.out { opacity: 0; pointer-events: none; }
+  #terminal.fast { transition-duration: .3s; }
+
+  /* CRT scanlines */
+  #terminal::before {
+    content: "";
+    position: absolute; inset: 0;
+    pointer-events: none;
+    background: repeating-linear-gradient(
+      0deg,
+      rgba(0,0,0,.35) 0px, rgba(0,0,0,.35) 1px,
+      transparent 1px, transparent 3px
+    );
+    z-index: 3;
+  }
+  /* CSS-only noise (SVG data URI) + vignette */
+  #terminal::after {
+    content: "";
+    position: absolute; inset: -50%;
+    pointer-events: none;
+    opacity: .09;
+    background-image: url("data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 .7 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+    animation: noiseShift .6s steps(6) infinite;
+    z-index: 2;
+  }
+  @keyframes noiseShift {
+    0%   { transform: translate(0,0); }
+    20%  { transform: translate(-3%, 2%); }
+    40%  { transform: translate(2%, -4%); }
+    60%  { transform: translate(-4%, -1%); }
+    80%  { transform: translate(3%, 3%); }
+    100% { transform: translate(0,0); }
+  }
+  .vignette {
+    position: absolute; inset: 0; pointer-events: none; z-index: 1;
+    background: radial-gradient(ellipse at center, transparent 45%, rgba(0,0,0,.85) 100%);
+  }
+
+  #term-lines {
+    position: relative; z-index: 4;
+    font-size: clamp(.8rem, 1.7vw, 1.15rem);
+    line-height: 1.9;
+    letter-spacing: .06em;
+    text-shadow: 0 0 8px rgba(74,222,128,.55);
+    animation: flicker 4s infinite;
+  }
+  @keyframes flicker {
+    0%, 100% { opacity: 1; }
+    92% { opacity: 1; }
+    93% { opacity: .85; }
+    94% { opacity: 1; }
+  }
+  .tline { white-space: pre-wrap; }
+  .tline .num { color: rgba(74,222,128,.38); margin-right: 1.1ch; text-shadow: none; }
+  .tline.warn .txt { color: var(--red); text-shadow: 0 0 8px rgba(220,38,38,.6); }
+  .cursor {
+    display: inline-block;
+    animation: blink 1s steps(1) infinite;
+    margin-left: 1px;
+  }
+  @keyframes blink { 0%, 50% { opacity: 1; } 51%, 100% { opacity: 0; } }
+
+  /* Fallback (no-3D) terminal exit: CRT power-off collapse */
+  #terminal.crt-off {
+    animation: crtOff .75s cubic-bezier(.7,0,.3,1) forwards;
+    pointer-events: none;
+  }
+  @keyframes crtOff {
+    0%   { transform: scale(1,1); opacity: 1; filter: brightness(1); }
+    55%  { transform: scale(1,.006); opacity: 1; filter: brightness(3); }
+    100% { transform: scale(0,.006); opacity: 0; filter: brightness(6); }
+  }
+
+  /* ---------- HUD (during 3D scan) ---------- */
+  #hud {
+    position: fixed; inset: 0;
+    z-index: 5;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity .6s ease;
+    color: var(--red);
+    font-size: .72rem;
+    letter-spacing: .3em;
+    text-transform: uppercase;
+  }
+  #hud.on { opacity: 1; }
+  #hud .tl { position: absolute; top: 1.75rem; left: 1.75rem; }
+  #hud .br { position: absolute; bottom: 1.75rem; right: 1.75rem; text-align: right; opacity: .7; }
+  #hud .corner { position: absolute; width: 28px; height: 28px; border: 1px solid rgba(220,38,38,.7); }
+  #hud .c1 { top: 1rem; left: 1rem; border-right: 0; border-bottom: 0; }
+  #hud .c2 { top: 1rem; right: 1rem; border-left: 0; border-bottom: 0; }
+  #hud .c3 { bottom: 1rem; left: 1rem; border-right: 0; border-top: 0; }
+  #hud .c4 { bottom: 1rem; right: 1rem; border-left: 0; border-top: 0; }
+  #hud .scanbar {
+    position: absolute; left: 0; right: 0; height: 90px; top: 15%;
+    background: linear-gradient(180deg, transparent, rgba(220,38,38,.12) 70%, rgba(220,38,38,.5) 99%, transparent 100%);
+    animation: scan 2s ease-in-out infinite alternate;
+  }
+  @keyframes scan { from { top: 12%; } to { top: 78%; } }
+
+  /* ---------- THE CUT ---------- */
+  #halves { position: fixed; inset: 0; z-index: 50; display: none; pointer-events: none; }
+  #halves.on { display: block; }
+  .half {
+    position: absolute; inset: 0;
+    background: var(--bg);
+    transition: transform .5s cubic-bezier(.7, 0, .2, 1);
+    will-change: transform;
+  }
+  .half canvas { display: block; width: 100%; height: 100%; }
+  .half.top { clip-path: polygon(0 0, 100% 0, 100% 50%, 0 50%); }
+  .half.bot { clip-path: polygon(0 50%, 100% 50%, 100% 100%, 0 100%); }
+  .half.top.split { transform: translateY(-100%); }
+  .half.bot.split { transform: translateY(100%); }
+
+  #slash {
+    position: fixed; left: 0; top: 50%; width: 100%; height: 2px;
+    margin-top: -1px;
+    z-index: 60;
+    background: var(--red);
+    box-shadow: 0 0 14px 2px rgba(220,38,38,.8);
+    transform: scaleX(0);
+    transform-origin: left center;
+    transition: transform .5s cubic-bezier(.65, 0, .35, 1), opacity .35s ease;
+    pointer-events: none;
+    display: none;
+  }
+  #slash.on { display: block; }
+  #slash.sweep { transform: scaleX(1); }
+  #slash.flash {
+    height: 5px; margin-top: -2.5px;
+    background: #ffb4ae;
+    box-shadow: 0 0 40px 10px rgba(255,81,72,.95), 0 0 120px 20px rgba(220,38,38,.6);
+  }
+  #slash.gone { opacity: 0; }
+
+  /* ---------- ENTER OUTRO ---------- */
+  #content:focus { outline: none; }
+
+  /* Phase 1: glitch. Monitor "tear" = horizontal bands cut out of the hero
+     while the whole block jitters 5-10px left/right. steps(1) = hard cuts. */
+  #hero.glitch { animation: heroTear .3s steps(1, end) both; }
+  #hero.glitch h1,
+  body.revealed #hero.glitch h1 { animation: h1Glitch .3s steps(1, end) both; }
+
+  @keyframes heroTear {
+    0%   { transform: translateX(0);     clip-path: inset(0); }
+    10%  { transform: translateX(-8px);  clip-path: polygon(0 0,100% 0,100% 28%,0 28%,0 34%,100% 34%,100% 100%,0 100%); }
+    20%  { transform: translateX(9px);   clip-path: inset(0); }
+    30%  { transform: translateX(-6px);  clip-path: polygon(0 0,100% 0,100% 58%,0 58%,0 66%,100% 66%,100% 100%,0 100%); }
+    40%  { transform: translateX(7px);   clip-path: polygon(0 0,100% 0,100% 12%,0 12%,0 15%,100% 15%,100% 100%,0 100%); }
+    50%  { transform: translateX(-10px); clip-path: inset(0); }
+    60%  { transform: translateX(5px);   clip-path: polygon(0 0,100% 0,100% 44%,0 44%,0 53%,100% 53%,100% 100%,0 100%); }
+    70%  { transform: translateX(-9px);  clip-path: inset(0); }
+    80%  { transform: translateX(8px);   clip-path: polygon(0 0,100% 0,100% 74%,0 74%,0 79%,100% 79%,100% 100%,0 100%); }
+    90%  { transform: translateX(-5px);  clip-path: inset(0); }
+    100% { transform: translateX(0);     clip-path: inset(0); }
+  }
+  @keyframes h1Glitch {
+    0%   { transform: translateX(0);     text-shadow: 0 0 40px rgba(0,0,0,.8); }
+    10%  { transform: translateX(10px);  text-shadow: 6px 0 rgba(220,38,38,.95), -6px 0 rgba(0,255,255,.7); }
+    25%  { transform: translateX(-8px);  text-shadow: -5px 0 rgba(220,38,38,.95), 5px 0 rgba(0,255,255,.7); }
+    40%  { transform: translateX(6px);   text-shadow: 4px 0 rgba(220,38,38,.95), -4px 0 rgba(0,255,255,.7); }
+    55%  { transform: translateX(-10px); text-shadow: -7px 0 rgba(220,38,38,.95), 7px 0 rgba(0,255,255,.7); }
+    70%  { transform: translateX(7px);   text-shadow: 5px 0 rgba(220,38,38,.95), -5px 0 rgba(0,255,255,.7); }
+    85%  { transform: translateX(-5px);  text-shadow: -3px 0 rgba(220,38,38,.95), 3px 0 rgba(0,255,255,.7); }
+    100% { transform: translateX(0);     text-shadow: 0 0 40px rgba(0,0,0,.8); }
+  }
+
+  /* Hero clone (visual only) */
+  .hero-clone { position: absolute; left: 0; width: 100%; margin: 0; }
+  .hero-clone h1,
+  body.revealed .hero-clone h1 { animation: none !important; }
+  .hero-clone .reveal { transition: none !important; }
+
+  /* Hero is hidden (not removed) while the clones slide away, so layout never jumps */
+  #hero.outro-hidden { opacity: 0; }
+
+  /* Phase 2: reverse cut — two halves of the hero */
+  #outro { position: fixed; inset: 0; z-index: 40; pointer-events: none; overflow: hidden; }
+  .outro-half {
+    position: absolute; inset: 0;
+    overflow: hidden;
+    transition: transform .4s cubic-bezier(.7, 0, .2, 1);
+    will-change: transform;
+  }
+  .outro-half.top { clip-path: polygon(0 0, 100% 0, 100% 50%, 0 50%); }
+  .outro-half.bot { clip-path: polygon(0 50%, 100% 50%, 100% 100%, 0 100%); }
+  .outro-half.top.split { transform: translateY(-100%); }
+  .outro-half.bot.split { transform: translateY(100%); }
+
+  /* Re-use #slash, sweeping RIGHT -> LEFT */
+  #slash.rtl {
+    transform-origin: right center;
+    transition: transform .35s cubic-bezier(.65, 0, .35, 1), opacity .25s ease;
+  }
+
+  /* 100ms red flash + reduced-motion veil */
+  #flash {
+    position: fixed; inset: 0; z-index: 70;
+    background: rgba(220, 38, 38, .38);
+    opacity: 0; pointer-events: none;
+    mix-blend-mode: screen;
+  }
+  #veil {
+    position: fixed; inset: 0; z-index: 80;
+    background: var(--bg);
+    opacity: 0; pointer-events: none;
+  }
+
+  /* ---------- REDUCED MOTION ---------- */
+  @media (prefers-reduced-motion: reduce) {
+    html { scroll-behavior: auto; }
+    .reveal, body.revealed .reveal { transition: opacity .3s ease, visibility 0s; transform: none; }
+    body.revealed h1 { animation: none; }
+    .dot, .cursor, #terminal::after, #term-lines, #hud .scanbar { animation: none; }
+  }
+</style>
+</head>
+<body class="intro-lock">
+
+<!-- 3D background (z-index 0, pointer-events none) -->
+<div id="gl" aria-hidden="true"></div>
+
+<!-- Fixed chrome -->
+<header class="hdr reveal">
+  <span id="hdr-text">PROTOCOL // GHOST_SHELL</span>
+  <span class="dot" aria-hidden="true"></span>
+</header>
+<footer class="ftr reveal" id="ftr-text">SYSTEM v2.0 // ONLINE</footer>
+
+<!-- Landing -->
+<main>
+  <section id="hero">
+    <div class="eyebrow reveal">[ Session 0x7F3A // Authenticated ]</div>
+    <h1 class="reveal">ACCESS<br>GRANTED</h1>
+    <p class="subtitle reveal">The system is yours.</p>
+    <button class="btn reveal" id="enter" type="button">ENTER</button>
+  </section>
+
+  <section id="content" tabindex="-1">
+    <p>Your content goes here.</p>
+  </section>
+</main>
+
+<!-- 3D scan HUD -->
+<div id="hud" aria-hidden="true">
+  <div class="scanbar"></div>
+  <div class="corner c1"></div><div class="corner c2"></div>
+  <div class="corner c3"></div><div class="corner c4"></div>
+  <div class="tl" id="hud-text">CORE SCAN // 000%</div>
+  <div class="br">TARGET: GHOST_SHELL<br>STATUS: ANALYZING</div>
+</div>
+
+<!-- Katana cut layers -->
+<div id="halves" aria-hidden="true">
+  <div class="half top"><canvas id="half-top"></canvas></div>
+  <div class="half bot"><canvas id="half-bot"></canvas></div>
+</div>
+<div id="slash" aria-hidden="true"></div>
+
+<!-- ENTER outro layers -->
+<div id="outro" aria-hidden="true"></div>
+<div id="flash" aria-hidden="true"></div>
+<div id="veil" aria-hidden="true"></div>
+
+<!-- Terminal boot overlay -->
+<div id="terminal" role="status" aria-live="polite" aria-label="System boot log">
+  <div class="vignette"></div>
+  <div id="term-lines" aria-hidden="true"></div>
+  <div class="sr-only" id="term-sr"></div>
+</div>
+
+<script type="module">
+  /* =========================================================
+     GHOST_SHELL — cinematic intro
+     Phase 1: terminal boot   (~0–3s)
+     Phase 2: 3D reveal       (~3–6s)
+     Phase 3: the cut         (~6–7s)
+     Phase 4: landing + interaction
+     ========================================================= */
+
+  const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const lowPower = (navigator.hardwareConcurrency || 8) < 4;
+
+  const $ = (id) => document.getElementById(id);
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+  const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+
+  const els = {
+    terminal: $('terminal'),
+    lines: $('term-lines'),
+    sr: $('term-sr'),
+    gl: $('gl'),
+    hud: $('hud'),
+    hudText: $('hud-text'),
+    halves: $('halves'),
+    halfTop: $('half-top'),
+    halfBot: $('half-bot'),
+    slash: $('slash'),
+    hero: $('hero'),
+    enter: $('enter')
+  };
+
+  if ('scrollRestoration' in history) history.scrollRestoration = 'manual';
+  window.scrollTo(0, 0);
+
+  const BOOT_LINES = [
+    'INITIALIZING NEURAL CORE...',
+    'LOADING PROTOCOL: GHOST',
+    'MEMORY CHECK: 128PB OK',
+    'SECURITY: BYPASSED',
+    'LOCATING TARGET...',
+    'TARGET LOCKED',
+    'MODE: STEALTH',
+    'ACCESS GRANTED // ENTER'
+  ];
+  const WARN_LINES = new Set([3, 5]);
+
+  /* ---------------------------------------------------------
+     3D STATE
+     --------------------------------------------------------- */
+  const BG_OPACITY = 0.5;       // canvas opacity once it is a background
+  const state = {
+    three: null,                // { THREE, renderer, scene, camera, group, core, outer, particles }
+    loopWanted: false,
+    raf: 0,
+    last: 0,
+    scaleStart: null,           // ms timestamp when scale-in began (null = not animating)
+    introDone: false,
+    cutActive: false,
+    glOpacity: 0,
+    glTarget: 0,
+    mouseX: 0, mouseY: 0,
+    targetZ: 6,
+    hudStart: null
+  };
+
+  /* ---------------------------------------------------------
+     THREE.JS SETUP (dynamic import so an offline CDN can't
+     kill the rest of the page)
+     --------------------------------------------------------- */
+  async function initThree() {
+    if (lowPower) return null;                         // < 4 cores: skip 3D entirely
+    try {
+      const THREE = await import('three');
+
+      // Quick capability probe before building a renderer
+      const probe = document.createElement('canvas');
+      if (!(probe.getContext('webgl2') || probe.getContext('webgl'))) return null;
+
+      const renderer = new THREE.WebGLRenderer({
+        antialias: true,
+        alpha: true,
+        powerPreference: 'low-power'
+      });
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      renderer.setClearColor(0x000000, 0);
+      els.gl.appendChild(renderer.domElement);
+
+      const scene = new THREE.Scene();
+      const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 100);
+      camera.position.set(0, 0, 6);
+      camera.lookAt(0, 0, 0);
+
+      const RED = 0xdc2626;
+      const group = new THREE.Group();
+      group.scale.setScalar(0.0001);                   // starts "scaled to 0"
+      scene.add(group);
+
+      // Core icosahedron (wireframe)
+      const coreGeo = new THREE.WireframeGeometry(new THREE.IcosahedronGeometry(1.6, 1));
+      const core = new THREE.LineSegments(
+        coreGeo,
+        new THREE.LineBasicMaterial({ color: RED, transparent: true, opacity: 0.8 })
+      );
+      group.add(core);
+
+      // Outer wireframe sphere
+      const outerGeo = new THREE.WireframeGeometry(new THREE.SphereGeometry(2.6, 32, 24));
+      const outer = new THREE.LineSegments(
+        outerGeo,
+        new THREE.LineBasicMaterial({ color: RED, transparent: true, opacity: 0.25 })
+      );
+      group.add(outer);
+
+      // 400 particles in a spherical shell
+      const COUNT = 400;
+      const pos = new Float32Array(COUNT * 3);
+      for (let i = 0; i < COUNT; i++) {
+        const r = 3.0 + Math.random() * 1.2;
+        const u = Math.random() * 2 - 1;
+        const t = Math.random() * Math.PI * 2;
+        const s = Math.sqrt(1 - u * u);
+        pos[i * 3]     = r * s * Math.cos(t);
+        pos[i * 3 + 1] = r * u;
+        pos[i * 3 + 2] = r * s * Math.sin(t);
+      }
+      const pGeo = new THREE.BufferGeometry();
+      pGeo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+      const particles = new THREE.Points(
+        pGeo,
+        new THREE.PointsMaterial({ color: RED, size: 0.035, transparent: true, opacity: 0.6, sizeAttenuation: true })
+      );
+      group.add(particles);
+
+      return { THREE, renderer, scene, camera, group, core, outer, particles };
+    } catch (err) {
+      console.warn('[intro] 3D disabled:', err);
+      return null;
+    }
+  }
+
+  // Start loading immediately, in parallel with the terminal typing.
+  const threePromise = initThree();
+
+  /* ---------------------------------------------------------
+     RENDER LOOP
+     --------------------------------------------------------- */
+  // Two-segment overshoot: 0 -> 1.08 -> 1 over `t` in [0,1]
+  function overshootScale(t) {
+    t = clamp(t, 0, 1);
+    const split = 0.62;
+    if (t < split) {
+      const k = t / split;
+      const e = 1 - Math.pow(1 - k, 3);                // easeOutCubic
+      return 1.08 * e;
+    }
+    const k = (t - split) / (1 - split);
+    const e = k < 0.5 ? 4 * k * k * k : 1 - Math.pow(-2 * k + 2, 3) / 2; // easeInOutCubic
+    return 1.08 - 0.08 * e;
+  }
+
+  function update(dt, now) {
+    const { group, core, outer, particles, camera } = state.three;
+
+    // Core + outer rotations
+    core.rotation.y += 0.15 * dt;
+    core.rotation.x += 0.05 * dt;
+    outer.rotation.y -= 0.075 * dt;
+    outer.rotation.x -= 0.025 * dt;
+    particles.rotation.y -= 0.02 * dt;
+
+    // Scale-in
+    if (state.scaleStart !== null) {
+      const t = (now - state.scaleStart) / 1200;
+      group.scale.setScalar(Math.max(0.0001, overshootScale(t)));
+      if (t >= 1) { group.scale.setScalar(1); state.scaleStart = null; }
+    }
+
+    // Mouse-driven tilt + wheel zoom (only after intro)
+    if (state.introDone) {
+      const ty = state.mouseX * 0.3;
+      const tx = state.mouseY * 0.2;
+      group.rotation.y += (ty - group.rotation.y) * 0.05;
+      group.rotation.x += (tx - group.rotation.x) * 0.05;
+      camera.position.z += (state.targetZ - camera.position.z) * 0.05;
+
+      // fade the background as the user scrolls past the hero
+      const p = clamp(window.scrollY / window.innerHeight, 0, 1);
+      state.glTarget = BG_OPACITY * (1 - p);
+    }
+
+    // Canvas opacity easing
+    const k = Math.min(1, dt * 4);
+    state.glOpacity += (state.glTarget - state.glOpacity) * k;
+    els.gl.style.opacity = state.glOpacity.toFixed(3);
+
+    // HUD percentage
+    if (state.hudStart !== null) {
+      const pct = clamp(Math.floor(((now - state.hudStart) / 2800) * 100), 0, 100);
+      const txt = 'CORE SCAN // ' + String(pct).padStart(3, '0') + '%';
+      if (els.hudText.textContent !== txt) els.hudText.textContent = txt;
+    }
+  }
+
+  function renderFrame() {
+    const { renderer, scene, camera } = state.three;
+    renderer.render(scene, camera);
+    if (state.cutActive) copyToHalves();
+  }
+
+  function frame(now) {
+    state.raf = requestAnimationFrame(frame);
+    const dt = Math.min((now - state.last) / 1000, 0.1);
+    state.last = now;
+    update(dt, now);
+    // Skip drawing when the background has been scrolled fully away
+    if (state.introDone && state.glOpacity < 0.01 && state.glTarget < 0.01) return;
+    renderFrame();
+  }
+
+  function startLoop() {
+    state.loopWanted = true;
+    if (state.raf || document.hidden || !state.three) return;
+    state.last = performance.now();
+    state.raf = requestAnimationFrame(frame);
+  }
+  function stopLoop() {
+    cancelAnimationFrame(state.raf);
+    state.raf = 0;
+  }
+
+  // Pause when the tab is hidden
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) stopLoop();
+    else if (state.loopWanted) startLoop();
+  });
+
+  // Resize (throttled with rAF)
+  let resizeQueued = false;
+  window.addEventListener('resize', () => {
+    if (resizeQueued) return;
+    resizeQueued = true;
+    requestAnimationFrame(() => {
+      resizeQueued = false;
+      if (!state.three) return;
+      const { renderer, camera } = state.three;
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+  });
+
+  /* ---------------------------------------------------------
+     PHASE 1 — TERMINAL BOOT
+     --------------------------------------------------------- */
+  const cursor = document.createElement('span');
+  cursor.className = 'cursor';
+  cursor.textContent = '_';
+
+  function makeLine(i) {
+    const row = document.createElement('div');
+    row.className = 'tline' + (WARN_LINES.has(i) ? ' warn' : '');
+    const num = document.createElement('span');
+    num.className = 'num';
+    num.textContent = '>' + String(i + 1).padStart(2, '0');
+    const txt = document.createElement('span');
+    txt.className = 'txt';
+    row.appendChild(num);
+    row.appendChild(txt);
+    els.lines.appendChild(row);
+
+    // Announce the full line once to assistive tech (visual typing is aria-hidden)
+    const sr = document.createElement('div');
+    sr.textContent = BOOT_LINES[i];
+    els.sr.appendChild(sr);
+    return txt;
+  }
+
+  function typeLine(i) {
+    return new Promise((resolve) => {
+      const txt = makeLine(i);
+      txt.appendChild(cursor);
+      const full = BOOT_LINES[i];
+      const duration = 260 + Math.random() * 140;      // randomized speed per line
+      const start = performance.now();
+      const node = document.createTextNode('');
+      txt.insertBefore(node, cursor);
+      let shown = 0;
+      (function tick(now) {
+        const n = Math.min(full.length, Math.floor(((now - start) / duration) * full.length));
+        if (n !== shown) { shown = n; node.nodeValue = full.slice(0, n); }
+        if (n >= full.length) return resolve();
+        requestAnimationFrame(tick);
+      })(start);
+    });
+  }
+
+  async function runTerminal() {
+    if (reduceMotion) {
+      BOOT_LINES.forEach((line, i) => {
+        const txt = makeLine(i);
+        txt.textContent = line;
+        if (i === BOOT_LINES.length - 1) txt.appendChild(cursor);
+      });
+      await sleep(500);
+      return;
+    }
+    await sleep(150);
+    for (let i = 0; i < BOOT_LINES.length; i++) {
+      await typeLine(i);
+      await sleep(30 + Math.random() * 30);
+    }
+  }
+
+  /* ---------------------------------------------------------
+     PHASE 2 — 3D REVEAL
+     --------------------------------------------------------- */
+  async function run3DReveal() {
+    els.terminal.classList.add('out');
+    els.hud.classList.add('on');
+    state.glTarget = 1;
+    state.scaleStart = performance.now();
+    state.hudStart = performance.now();
+    startLoop();
+    setTimeout(() => { els.terminal.style.display = 'none'; }, 700);
+    await sleep(3000);                                  // hold on the scanning core
+  }
+
+  /* ---------------------------------------------------------
+     PHASE 3 — THE CUT
+     --------------------------------------------------------- */
+  const halfCtx = { top: null, bot: null };
+
+  function setupHalves() {
+    const src = state.three.renderer.domElement;
+    const w = src.width, h = src.height;
+    [els.halfTop, els.halfBot].forEach((c) => { c.width = w; c.height = h; });
+    halfCtx.top = els.halfTop.getContext('2d');
+    halfCtx.bot = els.halfBot.getContext('2d');
+  }
+
+  // Copies the live WebGL frame into the two halves.
+  // Must be called synchronously after renderer.render() (no preserveDrawingBuffer needed).
+  function copyToHalves() {
+    const src = state.three.renderer.domElement;
+    const w = src.width, h = src.height, hh = Math.floor(h / 2);
+    halfCtx.top.clearRect(0, 0, w, h);
+    halfCtx.bot.clearRect(0, 0, w, h);
+    halfCtx.top.drawImage(src, 0, 0, w, hh, 0, 0, w, hh);
+    halfCtx.bot.drawImage(src, 0, hh, w, h - hh, 0, hh, w, h - hh);
+  }
+
+  function revealLanding() {
+    document.body.classList.add('revealed');
+  }
+
+  async function runCut() {
+    state.hudStart = null;
+    els.hud.classList.remove('on');
+
+    // Swap the live canvas for two opaque halves holding the same frame
+    setupHalves();
+    state.cutActive = true;
+    renderFrame();
+    els.halves.classList.add('on');
+    state.glOpacity = 0;
+    state.glTarget = 0;
+    els.gl.style.opacity = '0';
+
+    // Slash sweeps left -> right
+    els.slash.classList.add('on');
+    void els.slash.offsetWidth;                         // force reflow so the transition runs
+    els.slash.classList.add('sweep');
+    await sleep(250);
+
+    // Midpoint flash (100ms)
+    els.slash.classList.add('flash');
+    await sleep(100);
+    els.slash.classList.remove('flash');
+    await sleep(150);
+
+    // Halves slide apart and off-screen (0.5s); landing is revealed underneath
+    els.halves.querySelector('.top').classList.add('split');
+    els.halves.querySelector('.bot').classList.add('split');
+    els.slash.classList.add('gone');
+    revealLanding();
+    await sleep(560);
+
+    state.cutActive = false;
+    els.halves.classList.remove('on');
+    els.slash.classList.remove('on');
+  }
+
+  /* ---------------------------------------------------------
+     PHASE 4 — FINISH / FALLBACKS
+     --------------------------------------------------------- */
+  function finishIntro() {
+    document.body.classList.remove('intro-lock');
+    els.terminal.style.display = 'none';
+    state.introDone = true;
+    state.glTarget = BG_OPACITY;
+    if (state.three) {
+      state.targetZ = state.three.camera.position.z;
+      startLoop();
+    }
+  }
+
+  // Degraded path (no WebGL / low-core device): the 3D reveal and katana cut are
+  // replaced with a CSS-only CRT "power-off" collapse of the terminal into the landing.
+  async function runFallback() {
+    await sleep(450);
+    els.terminal.classList.add('crt-off');
+    await sleep(380);
+    revealLanding();
+    await sleep(400);
+    finishIntro();
+  }
+
+  // Reduced motion: 300ms cross-fade, no scale-in, no cut.
+  async function runReduced() {
+    const { group } = state.three;
+    group.scale.setScalar(1);
+    els.terminal.classList.add('fast', 'out');
+    revealLanding();
+    state.glTarget = BG_OPACITY;
+    startLoop();
+    await sleep(320);
+    finishIntro();
+  }
+
+  /* ---------------------------------------------------------
+     INTERACTION
+     --------------------------------------------------------- */
+  window.addEventListener('pointermove', (e) => {
+    state.mouseX = (e.clientX / window.innerWidth) * 2 - 1;
+    state.mouseY = (e.clientY / window.innerHeight) * 2 - 1;
+  }, { passive: true });
+
+  // Wheel zoom only while over the hero; never prevents default so page scroll is untouched.
+  els.hero.addEventListener('wheel', (e) => {
+    if (!state.introDone || !state.three || outro.busy) return;
+    const d = e.deltaMode === 1 ? e.deltaY * 16 : e.deltaY;
+    state.targetZ = clamp(state.targetZ + d * 0.004, 5, 8);
+  }, { passive: true });
+
+  /* ---------------------------------------------------------
+     ENTER OUTRO
+     Phase 1  glitch        (~0.3s)  jitter + tear + 100ms red flash
+     Phase 2  reverse cut   (~0.5s)  slash right->left, DOM-cloned hero halves split
+     Phase 3  reveal        (~0.5s)  scroll to #content, header/footer text decode
+     The WebGL canvas is untouched: it keeps rendering behind everything and
+     fades out gracefully via the existing scroll-based opacity in update().
+     --------------------------------------------------------- */
+  const outro = { busy: false };
+  const outroEls = {
+    layer: $('outro'),
+    flash: $('flash'),
+    veil: $('veil'),
+    hdr: $('hdr-text'),
+    ftr: $('ftr-text'),
+    content: $('content')
+  };
+  const NEW_HDR = 'MAINFRAME // ACCESSED';
+  const NEW_FTR = 'CONNECTION SECURE';
+
+  // Lock user scrolling while the sequence runs (no overflow toggle => no scrollbar layout shift)
+  const SCROLL_KEYS = new Set([' ', 'ArrowDown', 'ArrowUp', 'PageDown', 'PageUp', 'Home', 'End']);
+  window.addEventListener('wheel', (e) => { if (outro.busy) e.preventDefault(); }, { passive: false });
+  window.addEventListener('touchmove', (e) => { if (outro.busy) e.preventDefault(); }, { passive: false });
+  window.addEventListener('keydown', (e) => {
+    if (outro.busy && SCROLL_KEYS.has(e.key)) e.preventDefault();
+  });
+
+  const easeInOutCubic = (t) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
+
+  // rAF-driven scroll. behavior:'instant' bypasses the page's CSS smooth-scroll
+  // so each frame lands exactly where we ask (no stutter from stacked smooth scrolls).
+  function scrollToY(y, duration) {
+    return new Promise((resolve) => {
+      const from = window.scrollY;
+      const start = performance.now();
+      (function step(now) {
+        const t = clamp((now - start) / duration, 0, 1);
+        window.scrollTo({ top: from + (y - from) * easeInOutCubic(t), behavior: 'instant' });
+        if (t < 1) requestAnimationFrame(step); else resolve();
+      })(start);
+    });
+  }
+
+  // Terminal-style "decode" text swap, resolves left-to-right
+  function scrambleText(el, to, duration) {
+    const glyphs = '01#$%&@/<>_=+*';
+    const token = (el._scr = {});
+    const start = performance.now();
+    (function step(now) {
+      if (el._scr !== token) return;
+      const p = clamp((now - start) / duration, 0, 1);
+      const fixed = Math.floor(p * to.length);
+      let out = to.slice(0, fixed);
+      for (let i = fixed; i < to.length; i++) {
+        out += to[i] === ' ' ? ' ' : glyphs[(Math.random() * glyphs.length) | 0];
+      }
+      el.textContent = p >= 1 ? to : out;
+      if (p < 1) requestAnimationFrame(step);
+    })(start);
+  }
+
+  function swapChrome(animated) {
+    if (animated) {
+      scrambleText(outroEls.hdr, NEW_HDR, 450);
+      scrambleText(outroEls.ftr, NEW_FTR, 450);
+    } else {
+      outroEls.hdr._scr = outroEls.ftr._scr = null;
+      outroEls.hdr.textContent = NEW_HDR;
+      outroEls.ftr.textContent = NEW_FTR;
+    }
+  }
+
+  // Build two visually identical copies of the hero (DOM clones), each clipped to one half
+  function buildHeroHalves() {
+    const rect = els.hero.getBoundingClientRect();
+    const make = (cls) => {
+      const half = document.createElement('div');
+      half.className = 'outro-half ' + cls;
+      const clone = els.hero.cloneNode(true);
+      clone.removeAttribute('id');
+      clone.classList.remove('glitch');
+      clone.classList.add('hero-clone');
+      clone.setAttribute('aria-hidden', 'true');
+      clone.setAttribute('inert', '');
+      clone.querySelectorAll('[id]').forEach((n) => n.removeAttribute('id'));
+      clone.querySelectorAll('button, a, input').forEach((n) => { n.tabIndex = -1; });
+      clone.style.top = rect.top + 'px';        // matches wherever the hero currently sits
+      clone.style.height = rect.height + 'px';
+      half.appendChild(clone);
+      return half;
+    };
+    outroEls.layer.append(make('top'), make('bot'));
+  }
+
+  function resetSlash() {
+    els.slash.className = '';
+  }
+
+  async function outroFull() {
+    // ---- PHASE 1: THE GLITCH (0.3s) ----
+    els.hero.classList.add('glitch');
+    outroEls.flash.animate(
+      [{ opacity: 0 }, { opacity: 1, offset: 0.25 }, { opacity: 0 }],
+      { duration: 100, easing: 'linear' }
+    );
+    await sleep(300);
+
+    // Swap the real hero for its two cloned halves (seamless: glitch ends on a clean frame)
+    buildHeroHalves();
+    els.hero.classList.add('outro-hidden');
+
+    // ---- PHASE 2: THE REVERSE CUT (~0.5s) ----
+    resetSlash();
+    els.slash.classList.add('on', 'rtl');       // origin: right edge
+    void els.slash.offsetWidth;                  // reflow so the transition runs
+    els.slash.classList.add('sweep');            // scaleX 0 -> 1 from the right => sweeps R -> L
+
+    await sleep(120);
+    outroEls.layer.querySelectorAll('.outro-half').forEach((h) => h.classList.add('split'));
+    await sleep(60);
+    els.slash.classList.add('flash');            // brief brighten as the blade crosses centre
+    await sleep(100);
+    els.slash.classList.remove('flash');
+    els.slash.classList.add('gone');
+    await sleep(260);                            // halves finish leaving the screen
+
+    // ---- PHASE 3: THE REVEAL (~0.5s) ----
+    const targetY = outroEls.content.getBoundingClientRect().top + window.scrollY;
+    swapChrome(true);
+    await scrollToY(targetY, 500);
+  }
+
+  // Reduced motion: no glitch, no slash — 300ms cross-fade (150 out + 150 in)
+  async function outroReduced() {
+    const v = outroEls.veil;
+    v.style.transition = 'opacity .15s linear';
+    v.style.opacity = '1';
+    await sleep(150);
+    const targetY = outroEls.content.getBoundingClientRect().top + window.scrollY;
+    window.scrollTo({ top: targetY, behavior: 'instant' });
+    swapChrome(false);
+    v.style.opacity = '0';
+    await sleep(150);
+    v.style.transition = '';
+  }
+
+  async function runOutro() {
+    if (outro.busy || !state.introDone) return;
+    outro.busy = true;
+    try {
+      if (reduceMotion) await outroReduced(); else await outroFull();
+    } finally {
+      // Cleanup: hero is fully off-screen now, so restoring it is invisible
+      outroEls.layer.textContent = '';
+      resetSlash();
+      els.hero.classList.remove('glitch', 'outro-hidden');
+      outroEls.content.focus({ preventScroll: true });
+      outro.busy = false;
+    }
+  }
+
+  // Click handles mouse, touch, and the Enter/Space key on the focused button
+  els.enter.addEventListener('click', runOutro);
+
+  /* ---------------------------------------------------------
+     BOOT
+     --------------------------------------------------------- */
+  (async function main() {
+    await runTerminal();
+
+    // Don't wait forever for the CDN
+    state.three = await Promise.race([threePromise, sleep(3000).then(() => null)]);
+
+    if (!state.three) {
+      await runFallback();
+      return;
+    }
+    if (reduceMotion) {
+      await runReduced();
+      return;
+    }
+
+    await run3DReveal();
+    await runCut();
+    finishIntro();
+  })();
+</script>
+</body>
+</html>
