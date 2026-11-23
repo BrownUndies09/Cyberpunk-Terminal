@@ -1,1085 +1,1291 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>PROTOCOL // GHOST_SHELL</title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#f3decb">
+  <meta name="description" content="A little room. A little light. An interactive experience about staying.">
+  <title>The Warm Room</title>
+  <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;1,400;1,500&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.js",
+        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.180.0/examples/jsm/"
+      }
+    }
+  </script>
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #704333;
+      --muted: #a07864;
+      --transition-time: 3s;
+      font-family: "DM Sans", sans-serif;
+      font-synthesis: none;
+    }
 
-<script type="importmap">
-{
-  "imports": {
-    "three": "https://unpkg.com/three@0.160.0/build/three.module.js"
-  }
-}
-</script>
+    * { box-sizing: border-box; }
+    [hidden] { display: none !important; }
+    html, body { width: 100%; height: 100%; margin: 0; overflow: hidden; }
+    body { background: #f1d4bf; color: var(--ink); -webkit-font-smoothing: antialiased; }
+    button, input { font: inherit; }
+    button { -webkit-tap-highlight-color: transparent; cursor: pointer; }
+    button:disabled { cursor: default; }
+    button:focus-visible, input:focus-visible { outline: 2px solid #a56f54; outline-offset: 5px; }
+    ::selection { background: #dba493; color: #fff8ee; }
+    .serif { font-family: "Cormorant Garamond", Georgia, serif; }
+    .sr-only {
+      position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+      overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
+    }
 
-<style>
-  :root {
-    --bg: #050505;
-    --red: #dc2626;
-    --red-hot: #ff5148;
-    --green: #4ade80;
-    --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  }
+    .static-room, #scene, #vignette, #grain { position: fixed; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+    .static-room { z-index: 0; transition: filter var(--transition-time), opacity 1.5s; }
+    #scene { z-index: 1; opacity: 0; }
+    #scene canvas { display: block; width: 100%; height: 100%; }
+    #vignette {
+      z-index: 3; opacity: .16;
+      background: radial-gradient(ellipse at 50% 43%, transparent 26%, rgba(39, 17, 19, .1) 57%, rgba(8, 5, 10, .96) 100%);
+    }
+    #grain { z-index: 5; opacity: .035; mix-blend-mode: multiply; }
+    .gate-heart { transform-box: fill-box; transform-origin: center; animation: heart-idle 11s ease-in-out infinite alternate; }
+    .gate-heart-late { animation-delay: -6s; animation-duration: 14s; }
+    .gate-light { animation: light-idle 9s ease-in-out infinite alternate; }
 
-  *, *::before, *::after { box-sizing: border-box; }
+    .site-header {
+      position: fixed; z-index: 20; top: 0; left: 0; width: 100%;
+      padding: 32px 42px; display: flex; align-items: center; justify-content: space-between;
+      transition: color var(--transition-time), opacity .8s;
+    }
+    .brand { display: flex; align-items: center; gap: 11px; color: #895b47; transition: color var(--transition-time); }
+    .brand-symbol { width: 24px; height: 29px; }
+    .brand-name { font-size: 10px; font-weight: 500; letter-spacing: .19em; }
+    .gate-label { color: #a17c65; font-size: 9px; letter-spacing: .18em; }
+    #sound-toggle { display: flex; align-items: center; gap: 11px; background: none; border: 0; color: #8b604e; padding: 5px 0 5px 8px; }
+    .sound-label { font-size: 9px; letter-spacing: .16em; text-transform: uppercase; }
+    .sound-icon { width: 32px; height: 32px; border: 1px solid rgba(139, 96, 78, .25); border-radius: 50%; display: grid; place-items: center; }
+    .audio-bars { display: flex; align-items: center; gap: 2px; height: 12px; }
+    .audio-bars i { display: block; width: 1px; height: 8px; background: currentColor; border-radius: 1px; animation: sound-wave 1.5s ease-in-out infinite alternate; }
+    .audio-bars i:nth-child(2) { height: 12px; animation-delay: -.5s; }
+    .audio-bars i:nth-child(3) { height: 6px; animation-delay: -.9s; }
+    .audio-bars i:nth-child(4) { height: 10px; animation-delay: -.3s; }
+    #sound-toggle[aria-pressed="false"] .audio-bars i { animation-play-state: paused; transform: scaleY(.3); }
 
-  html { background: var(--bg); scroll-behavior: smooth; }
+    #gate { position: fixed; z-index: 25; inset: 0; }
+    .gate-center { position: absolute; left: 50%; top: 48.5%; transform: translate(-50%, -50%); width: min(90%, 650px); text-align: center; }
+    .little-star { width: 18px; height: 18px; color: #b3865c; margin: 0 auto 24px; }
+    .eyebrow { font-size: 9px; font-weight: 500; letter-spacing: .29em; text-transform: uppercase; color: #a17b5e; }
+    .gate-center .eyebrow { margin: 0 0 26px; }
+    .room-title { font-size: clamp(78px, 8.5vw, 126px); font-weight: 400; line-height: .84; letter-spacing: -.052em; margin: 0; color: #754634; text-wrap: nowrap; }
+    .room-title span, .room-title em { display: block; }
+    .room-title em { font-weight: 400; font-size: 1.24em; line-height: .97; letter-spacing: -.055em; }
+    #gate-message { min-height: 22px; margin: 29px 0 21px; font-size: 12px; letter-spacing: .01em; color: #8b624c; transition: color .2s; }
+    #gate-message.is-error { color: #a14e48; }
+    #gate-message.is-correct { color: #7f7056; }
+    .gate-form { width: min(100%, 374px); margin: 0 auto; display: flex; gap: 9px; }
+    .password-field {
+      min-width: 0; flex: 1; width: 100%; height: 49px; padding: 0 18px;
+      border: 1px solid rgba(159, 111, 85, .29); border-radius: 5px; background: rgba(255, 248, 235, .35);
+      color: #795039; font-size: 12px; letter-spacing: .035em; box-shadow: inset 0 1px 4px rgba(135, 85, 50, .025);
+      transition: border-color .25s, background .25s, box-shadow .25s;
+    }
+    .password-field::placeholder { color: #9b755b; opacity: 1; letter-spacing: .035em; }
+    .password-field:focus { outline: none; border-color: #b78b66; background: rgba(255, 250, 239, .55); box-shadow: 0 0 0 3px rgba(176, 123, 82, .06); }
+    .password-field:disabled { opacity: .75; }
+    .gate-form.is-rejected { animation: rejection-shake .43s ease-in-out; }
+    .gate-form.is-rejected .password-field { border-color: #bb6c61; box-shadow: 0 0 0 3px rgba(184, 90, 77, .065); }
+    .gate-submit {
+      height: 49px; padding: 0 20px; display: flex; gap: 15px; align-items: center; justify-content: center;
+      border: 1px solid rgba(120, 73, 45, .12); border-radius: 5px; background: #8a5c43; color: #fff3df;
+      font-size: 11px; box-shadow: 0 4px 12px rgba(125, 74, 39, .08); transition: background .25s, opacity .25s, transform .25s;
+    }
+    .gate-submit:hover:not(:disabled) { background: #774c38; transform: translateY(-1px); }
+    .gate-submit:disabled { opacity: .6; }
+    .arrow { width: 16px; height: 16px; flex-shrink: 0; }
+    .gate-undertext { font-family: "Cormorant Garamond", Georgia, serif; font-style: italic; font-size: 16px; color: #b38b71; margin: 24px 0 0; }
 
-  body {
-    margin: 0;
-    background: var(--bg);
-    color: #fff;
-    font-family: var(--mono);
-    -webkit-font-smoothing: antialiased;
-    min-height: 100vh;
-  }
+    #quiet-screen { position: fixed; z-index: 40; inset: 0; display: grid; place-items: center; background: #f7ede1; }
+    #quiet-line { opacity: 0; color: #886b54; font-size: clamp(14px, 2.7vw, 17px); font-weight: 400; padding: 24px; text-align: center; letter-spacing: .005em; }
 
-  body.intro-lock { overflow: hidden; height: 100vh; }
+    #experience { position: fixed; z-index: 10; inset: 0; opacity: 0; }
+    .warm-position { position: absolute; top: 42%; left: 50%; width: 92%; transform: translate(-50%, -50%); text-align: center; }
+    #welcome-content .eyebrow { margin: 0 0 29px; }
+    #welcome-content .room-title { font-size: clamp(80px, 8.9vw, 132px); }
+    .warm-subtitle { margin: 27px auto 0; color: #91624c; font-size: 12px; line-height: 1.8; letter-spacing: .005em; max-width: 390px; }
+    .button-dock { position: absolute; bottom: 17.5%; left: 50%; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; width: 90%; }
+    #warm-note { margin: 0 0 22px; color: #9a6a50; font-size: 20px; font-style: italic; font-weight: 400; opacity: 0; text-align: center; }
+    #enter-button {
+      position: relative; display: flex; align-items: center; justify-content: center; gap: 28px;
+      width: 177px; height: 59px; border: 1px solid rgba(255, 252, 226, .95); border-radius: 50px;
+      background: rgba(255, 247, 224, .87); color: #936047; font-size: 13px; letter-spacing: .045em;
+      box-shadow: 0 0 24px rgba(255, 240, 191, .8), 0 0 65px rgba(255, 226, 171, .4), inset 0 0 14px rgba(255, 255, 245, .65);
+      animation: button-breathe 4.6s ease-in-out infinite;
+      transition: color var(--transition-time), background var(--transition-time), border-color var(--transition-time), box-shadow var(--transition-time);
+    }
+    #enter-button::after { content: ""; position: absolute; inset: -7px; border: 1px solid rgba(255, 250, 221, .27); border-radius: inherit; pointer-events: none; transition: opacity var(--transition-time); }
+    #enter-button:hover:not(:disabled) { background: #fff8e7; }
+    #enter-button .arrow { width: 18px; transition: transform .3s; }
+    #enter-button:hover:not(:disabled) .arrow { transform: translateX(3px); }
+    #enter-label { min-width: 35px; text-align: left; }
+    .dark-note-position { position: absolute; top: 43%; left: 50%; width: min(83%, 710px); transform: translate(-50%, -50%); text-align: center; }
+    #dark-note { margin: 0; opacity: 0; color: #d3c3bc; font-family: "Cormorant Garamond", Georgia, serif; font-size: clamp(29px, 3.3vw, 49px); line-height: 1.35; font-weight: 400; letter-spacing: -.015em; text-wrap: balance; }
+    .site-footer { position: fixed; z-index: 20; bottom: 30px; left: 0; width: 100%; display: flex; align-items: center; justify-content: center; gap: 10px; color: #b08a70; font-size: 9px; letter-spacing: .13em; transition: opacity 1.3s, color var(--transition-time); }
+    .site-footer svg { width: 11px; height: 11px; }
+    .is-quiet .site-header, .is-quiet .site-footer { opacity: 0; pointer-events: none; }
+    .is-dark { color-scheme: dark; }
+    .is-dark .static-room { filter: saturate(.12) brightness(.085) hue-rotate(325deg); }
+    .is-resuming .static-room { transition: none; }
+    .is-dark .brand { color: #7f6c6d; }
+    .is-dark #sound-toggle { color: #857275; transition: color var(--transition-time); }
+    .is-dark .sound-icon { border-color: rgba(144, 111, 116, .27); transition: border-color var(--transition-time); }
+    .is-dark .site-footer { opacity: 0; pointer-events: none; }
+    .is-dark #enter-button { animation: none; background: rgba(25, 19, 23, .75); border-color: rgba(142, 105, 113, .25); color: #9e858b; box-shadow: 0 0 28px rgba(71, 11, 23, .09); }
+    .is-dark #enter-button::after { opacity: 0; }
+    .is-dark #enter-button:hover:not(:disabled) { background: rgba(43, 27, 33, .8); border-color: rgba(160, 115, 125, .4); }
+    .is-dark #enter-button.is-exhausted { opacity: .35; }
+    .is-dark #enter-button:focus-visible, .is-dark #sound-toggle:focus-visible { outline-color: #80626b; }
+    .is-glitching #scene { transform: translateX(.7px); filter: brightness(1.06) saturate(.75); }
+    .is-glitching #dark-note { text-shadow: 1px 0 rgba(130, 23, 42, .23), -1px 0 rgba(134, 149, 150, .13); }
+    .is-dark #grain { animation: grain-drift .33s steps(2) infinite; }
 
-  .sr-only {
-    position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
-    overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0;
-  }
+    #load-error { position: fixed; z-index: 50; inset: 0; background: #f7ede1; display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 22px; padding: 25px; text-align: center; }
+    #load-error p { font-size: 13px; line-height: 1.8; color: #9a7b63; }
+    #retry-button { background: none; border: 0; border-bottom: 1px solid #bd9b80; color: #8b654e; font-size: 12px; padding: 7px 0; }
+    .is-dark #load-error { background: #130e14; }
+    .is-dark #load-error p, .is-dark #retry-button { color: #a08a90; }
+    .is-dark #retry-button { border-color: #65505a; }
+    .fallback-petal { position: absolute; left: var(--left); top: -12%; width: var(--size); height: var(--size); background: #e8aa98; border-radius: 70% 0 70% 35%; opacity: .45; animation: fallback-float var(--duration) linear infinite; animation-delay: var(--delay); }
+    .is-dark .fallback-petal { background: #582e38; opacity: .15; animation-duration: 100s; }
 
-  /* ---------- 3D CANVAS (background layer) ---------- */
-  #gl {
-    position: fixed; inset: 0;
-    z-index: 0;
-    pointer-events: none;
-    opacity: 0;
-  }
-  #gl canvas { display: block; width: 100%; height: 100%; }
+    @keyframes button-breathe {
+      0%, 100% { box-shadow: 0 0 22px rgba(255, 240, 191, .65), 0 0 55px rgba(255, 226, 171, .3), inset 0 0 14px rgba(255, 255, 245, .65); }
+      50% { box-shadow: 0 0 35px rgba(255, 240, 191, .9), 0 0 85px rgba(255, 226, 171, .48), inset 0 0 14px rgba(255, 255, 245, .85); }
+    }
+    @keyframes heart-idle { from { transform: translateY(9px) rotate(-4deg); } to { transform: translateY(-12px) rotate(5deg); } }
+    @keyframes light-idle { from { opacity: .6; } to { opacity: .95; } }
+    @keyframes sound-wave { from { transform: scaleY(.35); } to { transform: scaleY(1); } }
+    @keyframes rejection-shake { 0%, 100% { transform: translateX(0); } 20%, 60% { transform: translateX(-5px); } 40%, 80% { transform: translateX(5px); } }
+    @keyframes grain-drift { 0%, 100% { transform: translate(0, 0); } 25% { transform: translate(-1px, 1px); } 75% { transform: translate(1px, -1px); } }
+    @keyframes fallback-float { from { transform: translateY(115vh) rotate(0); } to { transform: translateY(-10vh) rotate(150deg); } }
 
-  /* ---------- LANDING ---------- */
-  .reveal {
-    opacity: 0;
-    visibility: hidden;
-    transform: translateY(8px);
-    transition: opacity .7s ease, transform .7s ease, visibility 0s linear .7s;
-  }
-  body.revealed .reveal {
-    opacity: 1;
-    visibility: visible;
-    transform: none;
-    transition: opacity .7s ease, transform .7s ease, visibility 0s;
-  }
-
-  /* .hero-clone = visual duplicate used by the ENTER outro slice */
-  #hero, .hero-clone {
-    position: relative;
-    z-index: 1;
-    min-height: 100vh;
-    display: flex; flex-direction: column;
-    align-items: center; justify-content: center;
-    text-align: center;
-    padding: 6rem 1.5rem;
-  }
-
-  .eyebrow {
-    font-size: .75rem;
-    letter-spacing: .35em;
-    color: var(--red);
-    text-transform: uppercase;
-    margin-bottom: 1.5rem;
-  }
-
-  h1 {
-    margin: 0;
-    font-family: var(--mono);
-    font-weight: 800;
-    text-transform: uppercase;
-    font-size: clamp(2.6rem, 10.5vw, 10rem);
-    line-height: .9;
-    letter-spacing: -0.07em;
-    color: #fff;
-    text-shadow: 0 0 40px rgba(0,0,0,.8);
-  }
-  body.revealed h1 { animation: titleIn 1s cubic-bezier(.2,.8,.2,1) both; }
-  @keyframes titleIn {
-    0%   { letter-spacing: .08em; filter: blur(8px); opacity: 0; }
-    60%  { filter: blur(0); opacity: 1; }
-    100% { letter-spacing: -0.07em; filter: blur(0); opacity: 1; }
-  }
-
-  .subtitle {
-    margin: 1.75rem 0 2.75rem;
-    font-size: clamp(.9rem, 1.6vw, 1.15rem);
-    color: #a3a3a3;
-    letter-spacing: .08em;
-  }
-
-  .btn {
-    font-family: var(--mono);
-    font-size: .95rem;
-    letter-spacing: .4em;
-    padding: 1rem 2.6rem 1rem 3rem; /* compensate trailing tracking */
-    background: rgba(5,5,5,.6);
-    color: var(--red);
-    border: 1px solid var(--red);
-    cursor: pointer;
-    text-transform: uppercase;
-    transition: background .2s, color .2s, box-shadow .2s;
-  }
-  .btn:hover, .btn:focus-visible {
-    background: var(--red);
-    color: #050505;
-    box-shadow: 0 0 30px rgba(220,38,38,.5);
-  }
-  .btn:focus-visible { outline: 2px solid #fff; outline-offset: 4px; }
-
-  .hdr, .ftr {
-    position: fixed;
-    z-index: 2;
-    font-size: .72rem;
-    letter-spacing: .22em;
-    text-transform: uppercase;
-    color: #d4d4d4;
-    mix-blend-mode: normal;
-  }
-  .hdr { top: 1.5rem; left: 1.75rem; display: flex; align-items: center; gap: .9rem; }
-  .ftr { bottom: 1.5rem; right: 1.75rem; color: #737373; }
-  .dot {
-    width: 8px; height: 8px; border-radius: 50%;
-    background: var(--red);
-    box-shadow: 0 0 10px var(--red);
-    animation: pulse 1.4s ease-in-out infinite;
-  }
-  @keyframes pulse {
-    0%, 100% { opacity: 1; transform: scale(1); }
-    50% { opacity: .25; transform: scale(.7); }
-  }
-
-  #content {
-    position: relative;
-    z-index: 1;
-    min-height: 100vh;
-    display: flex; align-items: center; justify-content: center;
-    border-top: 1px solid rgba(220,38,38,.35);
-    background: rgba(5,5,5,.55);
-    color: #a3a3a3;
-    font-size: 1.1rem;
-    letter-spacing: .1em;
-  }
-
-  /* ---------- TERMINAL OVERLAY ---------- */
-  #terminal {
-    position: fixed; inset: 0;
-    z-index: 100;
-    background: var(--bg);
-    color: var(--green);
-    font-family: var(--mono);
-    padding: clamp(1.25rem, 5vw, 4rem);
-    display: flex; align-items: flex-start; justify-content: flex-start;
-    overflow: hidden;
-    transition: opacity .6s ease;
-  }
-  #terminal.out { opacity: 0; pointer-events: none; }
-  #terminal.fast { transition-duration: .3s; }
-
-  /* CRT scanlines */
-  #terminal::before {
-    content: "";
-    position: absolute; inset: 0;
-    pointer-events: none;
-    background: repeating-linear-gradient(
-      0deg,
-      rgba(0,0,0,.35) 0px, rgba(0,0,0,.35) 1px,
-      transparent 1px, transparent 3px
-    );
-    z-index: 3;
-  }
-  /* CSS-only noise (SVG data URI) + vignette */
-  #terminal::after {
-    content: "";
-    position: absolute; inset: -50%;
-    pointer-events: none;
-    opacity: .09;
-    background-image: url("data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 .7 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
-    animation: noiseShift .6s steps(6) infinite;
-    z-index: 2;
-  }
-  @keyframes noiseShift {
-    0%   { transform: translate(0,0); }
-    20%  { transform: translate(-3%, 2%); }
-    40%  { transform: translate(2%, -4%); }
-    60%  { transform: translate(-4%, -1%); }
-    80%  { transform: translate(3%, 3%); }
-    100% { transform: translate(0,0); }
-  }
-  .vignette {
-    position: absolute; inset: 0; pointer-events: none; z-index: 1;
-    background: radial-gradient(ellipse at center, transparent 45%, rgba(0,0,0,.85) 100%);
-  }
-
-  #term-lines {
-    position: relative; z-index: 4;
-    font-size: clamp(.8rem, 1.7vw, 1.15rem);
-    line-height: 1.9;
-    letter-spacing: .06em;
-    text-shadow: 0 0 8px rgba(74,222,128,.55);
-    animation: flicker 4s infinite;
-  }
-  @keyframes flicker {
-    0%, 100% { opacity: 1; }
-    92% { opacity: 1; }
-    93% { opacity: .85; }
-    94% { opacity: 1; }
-  }
-  .tline { white-space: pre-wrap; }
-  .tline .num { color: rgba(74,222,128,.38); margin-right: 1.1ch; text-shadow: none; }
-  .tline.warn .txt { color: var(--red); text-shadow: 0 0 8px rgba(220,38,38,.6); }
-  .cursor {
-    display: inline-block;
-    animation: blink 1s steps(1) infinite;
-    margin-left: 1px;
-  }
-  @keyframes blink { 0%, 50% { opacity: 1; } 51%, 100% { opacity: 0; } }
-
-  /* Fallback (no-3D) terminal exit: CRT power-off collapse */
-  #terminal.crt-off {
-    animation: crtOff .75s cubic-bezier(.7,0,.3,1) forwards;
-    pointer-events: none;
-  }
-  @keyframes crtOff {
-    0%   { transform: scale(1,1); opacity: 1; filter: brightness(1); }
-    55%  { transform: scale(1,.006); opacity: 1; filter: brightness(3); }
-    100% { transform: scale(0,.006); opacity: 0; filter: brightness(6); }
-  }
-
-  /* ---------- HUD (during 3D scan) ---------- */
-  #hud {
-    position: fixed; inset: 0;
-    z-index: 5;
-    pointer-events: none;
-    opacity: 0;
-    transition: opacity .6s ease;
-    color: var(--red);
-    font-size: .72rem;
-    letter-spacing: .3em;
-    text-transform: uppercase;
-  }
-  #hud.on { opacity: 1; }
-  #hud .tl { position: absolute; top: 1.75rem; left: 1.75rem; }
-  #hud .br { position: absolute; bottom: 1.75rem; right: 1.75rem; text-align: right; opacity: .7; }
-  #hud .corner { position: absolute; width: 28px; height: 28px; border: 1px solid rgba(220,38,38,.7); }
-  #hud .c1 { top: 1rem; left: 1rem; border-right: 0; border-bottom: 0; }
-  #hud .c2 { top: 1rem; right: 1rem; border-left: 0; border-bottom: 0; }
-  #hud .c3 { bottom: 1rem; left: 1rem; border-right: 0; border-top: 0; }
-  #hud .c4 { bottom: 1rem; right: 1rem; border-left: 0; border-top: 0; }
-  #hud .scanbar {
-    position: absolute; left: 0; right: 0; height: 90px; top: 15%;
-    background: linear-gradient(180deg, transparent, rgba(220,38,38,.12) 70%, rgba(220,38,38,.5) 99%, transparent 100%);
-    animation: scan 2s ease-in-out infinite alternate;
-  }
-  @keyframes scan { from { top: 12%; } to { top: 78%; } }
-
-  /* ---------- THE CUT ---------- */
-  #halves { position: fixed; inset: 0; z-index: 50; display: none; pointer-events: none; }
-  #halves.on { display: block; }
-  .half {
-    position: absolute; inset: 0;
-    background: var(--bg);
-    transition: transform .5s cubic-bezier(.7, 0, .2, 1);
-    will-change: transform;
-  }
-  .half canvas { display: block; width: 100%; height: 100%; }
-  .half.top { clip-path: polygon(0 0, 100% 0, 100% 50%, 0 50%); }
-  .half.bot { clip-path: polygon(0 50%, 100% 50%, 100% 100%, 0 100%); }
-  .half.top.split { transform: translateY(-100%); }
-  .half.bot.split { transform: translateY(100%); }
-
-  #slash {
-    position: fixed; left: 0; top: 50%; width: 100%; height: 2px;
-    margin-top: -1px;
-    z-index: 60;
-    background: var(--red);
-    box-shadow: 0 0 14px 2px rgba(220,38,38,.8);
-    transform: scaleX(0);
-    transform-origin: left center;
-    transition: transform .5s cubic-bezier(.65, 0, .35, 1), opacity .35s ease;
-    pointer-events: none;
-    display: none;
-  }
-  #slash.on { display: block; }
-  #slash.sweep { transform: scaleX(1); }
-  #slash.flash {
-    height: 5px; margin-top: -2.5px;
-    background: #ffb4ae;
-    box-shadow: 0 0 40px 10px rgba(255,81,72,.95), 0 0 120px 20px rgba(220,38,38,.6);
-  }
-  #slash.gone { opacity: 0; }
-
-  /* ---------- ENTER OUTRO ---------- */
-  #content:focus { outline: none; }
-
-  /* Phase 1: glitch. Monitor "tear" = horizontal bands cut out of the hero
-     while the whole block jitters 5-10px left/right. steps(1) = hard cuts. */
-  #hero.glitch { animation: heroTear .3s steps(1, end) both; }
-  #hero.glitch h1,
-  body.revealed #hero.glitch h1 { animation: h1Glitch .3s steps(1, end) both; }
-
-  @keyframes heroTear {
-    0%   { transform: translateX(0);     clip-path: inset(0); }
-    10%  { transform: translateX(-8px);  clip-path: polygon(0 0,100% 0,100% 28%,0 28%,0 34%,100% 34%,100% 100%,0 100%); }
-    20%  { transform: translateX(9px);   clip-path: inset(0); }
-    30%  { transform: translateX(-6px);  clip-path: polygon(0 0,100% 0,100% 58%,0 58%,0 66%,100% 66%,100% 100%,0 100%); }
-    40%  { transform: translateX(7px);   clip-path: polygon(0 0,100% 0,100% 12%,0 12%,0 15%,100% 15%,100% 100%,0 100%); }
-    50%  { transform: translateX(-10px); clip-path: inset(0); }
-    60%  { transform: translateX(5px);   clip-path: polygon(0 0,100% 0,100% 44%,0 44%,0 53%,100% 53%,100% 100%,0 100%); }
-    70%  { transform: translateX(-9px);  clip-path: inset(0); }
-    80%  { transform: translateX(8px);   clip-path: polygon(0 0,100% 0,100% 74%,0 74%,0 79%,100% 79%,100% 100%,0 100%); }
-    90%  { transform: translateX(-5px);  clip-path: inset(0); }
-    100% { transform: translateX(0);     clip-path: inset(0); }
-  }
-  @keyframes h1Glitch {
-    0%   { transform: translateX(0);     text-shadow: 0 0 40px rgba(0,0,0,.8); }
-    10%  { transform: translateX(10px);  text-shadow: 6px 0 rgba(220,38,38,.95), -6px 0 rgba(0,255,255,.7); }
-    25%  { transform: translateX(-8px);  text-shadow: -5px 0 rgba(220,38,38,.95), 5px 0 rgba(0,255,255,.7); }
-    40%  { transform: translateX(6px);   text-shadow: 4px 0 rgba(220,38,38,.95), -4px 0 rgba(0,255,255,.7); }
-    55%  { transform: translateX(-10px); text-shadow: -7px 0 rgba(220,38,38,.95), 7px 0 rgba(0,255,255,.7); }
-    70%  { transform: translateX(7px);   text-shadow: 5px 0 rgba(220,38,38,.95), -5px 0 rgba(0,255,255,.7); }
-    85%  { transform: translateX(-5px);  text-shadow: -3px 0 rgba(220,38,38,.95), 3px 0 rgba(0,255,255,.7); }
-    100% { transform: translateX(0);     text-shadow: 0 0 40px rgba(0,0,0,.8); }
-  }
-
-  /* Hero clone (visual only) */
-  .hero-clone { position: absolute; left: 0; width: 100%; margin: 0; }
-  .hero-clone h1,
-  body.revealed .hero-clone h1 { animation: none !important; }
-  .hero-clone .reveal { transition: none !important; }
-
-  /* Hero is hidden (not removed) while the clones slide away, so layout never jumps */
-  #hero.outro-hidden { opacity: 0; }
-
-  /* Phase 2: reverse cut — two halves of the hero */
-  #outro { position: fixed; inset: 0; z-index: 40; pointer-events: none; overflow: hidden; }
-  .outro-half {
-    position: absolute; inset: 0;
-    overflow: hidden;
-    transition: transform .4s cubic-bezier(.7, 0, .2, 1);
-    will-change: transform;
-  }
-  .outro-half.top { clip-path: polygon(0 0, 100% 0, 100% 50%, 0 50%); }
-  .outro-half.bot { clip-path: polygon(0 50%, 100% 50%, 100% 100%, 0 100%); }
-  .outro-half.top.split { transform: translateY(-100%); }
-  .outro-half.bot.split { transform: translateY(100%); }
-
-  /* Re-use #slash, sweeping RIGHT -> LEFT */
-  #slash.rtl {
-    transform-origin: right center;
-    transition: transform .35s cubic-bezier(.65, 0, .35, 1), opacity .25s ease;
-  }
-
-  /* 100ms red flash + reduced-motion veil */
-  #flash {
-    position: fixed; inset: 0; z-index: 70;
-    background: rgba(220, 38, 38, .38);
-    opacity: 0; pointer-events: none;
-    mix-blend-mode: screen;
-  }
-  #veil {
-    position: fixed; inset: 0; z-index: 80;
-    background: var(--bg);
-    opacity: 0; pointer-events: none;
-  }
-
-  /* ---------- REDUCED MOTION ---------- */
-  @media (prefers-reduced-motion: reduce) {
-    html { scroll-behavior: auto; }
-    .reveal, body.revealed .reveal { transition: opacity .3s ease, visibility 0s; transform: none; }
-    body.revealed h1 { animation: none; }
-    .dot, .cursor, #terminal::after, #term-lines, #hud .scanbar { animation: none; }
-  }
-</style>
+    @media (min-width: 1600px) { .room-title { font-size: 142px; } #welcome-content .room-title { font-size: 148px; } }
+    @media (max-width: 650px) {
+      .site-header { padding: 25px 23px; }
+      .brand { gap: 9px; }
+      .brand-name { font-size: 8px; letter-spacing: .15em; }
+      .brand-symbol { width: 21px; height: 26px; }
+      .gate-label { font-size: 7px; letter-spacing: .13em; }
+      .gate-center { top: 48%; }
+      .gate-center .eyebrow { font-size: 8px; margin-bottom: 25px; }
+      .little-star { width: 15px; margin-bottom: 22px; }
+      .room-title, #welcome-content .room-title { font-size: clamp(76px, 17.3vw, 110px); }
+      .gate-form { max-width: 322px; gap: 8px; }
+      .password-field { padding: 0 13px; font-size: 11px; }
+      .gate-submit { padding: 0 15px; gap: 9px; font-size: 10px; }
+      .gate-undertext { margin-top: 22px; font-size: 15px; }
+      #gate-message { margin-top: 27px; font-size: 11px; }
+      .warm-position { top: 41%; }
+      #welcome-content .eyebrow { font-size: 8px; margin-bottom: 27px; }
+      .warm-subtitle { font-size: 11px; max-width: 270px; margin-top: 25px; }
+      .button-dock { bottom: 18%; }
+      #warm-note { font-size: 18px; margin-bottom: 21px; }
+      #enter-button { width: 163px; height: 56px; font-size: 12px; }
+      .site-footer { bottom: 26px; font-size: 7px; gap: 8px; }
+      .sound-label { font-size: 8px; letter-spacing: .12em; }
+      #sound-toggle { gap: 8px; }
+      .sound-icon { width: 29px; height: 29px; }
+      .dark-note-position { top: 42%; width: 83%; }
+      #dark-note { font-size: clamp(30px, 7vw, 42px); line-height: 1.4; }
+    }
+    @media (max-height: 700px) {
+      .gate-center { top: 49%; }
+      .room-title, #welcome-content .room-title { font-size: clamp(64px, 10vh, 90px); }
+      .little-star { margin-bottom: 15px; height: 13px; }
+      .gate-center .eyebrow, #welcome-content .eyebrow { margin-bottom: 19px; }
+      #gate-message { margin-top: 22px; margin-bottom: 15px; }
+      .gate-undertext { margin-top: 17px; }
+      .warm-position { top: 40%; }
+      .warm-subtitle { margin-top: 20px; }
+      .button-dock { bottom: 13%; }
+      #warm-note { margin-bottom: 16px; font-size: 17px; }
+      #enter-button { height: 51px; }
+      .site-header { padding-top: 21px; }
+      .site-footer { bottom: 19px; }
+    }
+    @media (max-height: 480px) and (min-width: 650px) {
+      .room-title, #welcome-content .room-title { font-size: 54px; }
+      .little-star, .gate-center .eyebrow, .gate-undertext, #welcome-content .eyebrow { display: none; }
+      .gate-center { top: 51%; }
+      .warm-position { top: 36%; }
+      .warm-subtitle { margin-top: 13px; }
+      .button-dock { bottom: 11%; }
+      #warm-note { margin-bottom: 9px; }
+      .site-footer { display: none; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { animation: none !important; }
+      .is-glitching #scene { transform: none; filter: none; }
+    }
+  </style>
 </head>
-<body class="intro-lock">
+<body>
+  <!-- A procedural room illustration is visible immediately. WebGL only starts after the gate. -->
+  <svg class="static-room" viewBox="0 0 1600 1000" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+    <defs>
+      <linearGradient id="wall" x1="0" y1="0" x2="1" y2="1">
+        <stop stop-color="#f6e9d8"/><stop offset=".48" stop-color="#f1d3bd"/><stop offset="1" stop-color="#eac0ad"/>
+      </linearGradient>
+      <linearGradient id="arch-outer" x1="0" y1="0" x2="1" y2=".6">
+        <stop stop-color="#e6bca4"/><stop offset=".45" stop-color="#f6ddc3"/><stop offset="1" stop-color="#e2ad99"/>
+      </linearGradient>
+      <linearGradient id="arch-edge" x1="0" y1="0" x2="1" y2=".2">
+        <stop stop-color="#e3b59b"/><stop offset=".35" stop-color="#ffe8ca"/><stop offset="1" stop-color="#edbba2"/>
+      </linearGradient>
+      <radialGradient id="arch-center" cx=".5" cy=".32" r=".77">
+        <stop stop-color="#fff0ce"/><stop offset=".36" stop-color="#f7d8bb"/><stop offset=".76" stop-color="#efc0ad"/><stop offset="1" stop-color="#e8af9e"/>
+      </radialGradient>
+      <radialGradient id="sun-wash"><stop stop-color="#fffbe2" stop-opacity=".95"/><stop offset="1" stop-color="#ffe4aa" stop-opacity="0"/></radialGradient>
+      <linearGradient id="floor" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#edc8af"/><stop offset="1" stop-color="#f8ddc5"/></linearGradient>
+      <filter id="arch-shadow" x="-50%" y="-30%" width="200%" height="180%"><feGaussianBlur stdDeviation="18"/></filter>
+      <filter id="heart-soft" x="-60%" y="-60%" width="220%" height="220%"><feGaussianBlur stdDeviation=".7"/></filter>
+      <path id="heart-shape" d="M0 7 C-20 -15 -48 4 -40 26 C-35 44 0 64 0 64 C0 64 35 44 40 26 C48 4 20 -15 0 7Z"/>
+    </defs>
+    <rect width="1600" height="1000" fill="url(#wall)"/>
+    <ellipse cx="800" cy="848" rx="555" ry="55" fill="#bc866d" opacity=".16" filter="url(#arch-shadow)"/>
+    <path d="M318 872V426A482 482 0 0 1 1282 426V872Z" fill="#bd8c73" opacity=".15" filter="url(#arch-shadow)"/>
+    <path d="M328 873V426A472 472 0 0 1 1272 426V873Z" fill="url(#arch-outer)"/>
+    <path d="M363 873V427A437 437 0 0 1 1237 427V873Z" fill="#f9dec3"/>
+    <path d="M379 873V428A421 421 0 0 1 1221 428V873Z" fill="url(#arch-edge)"/>
+    <path d="M413 873V431A387 387 0 0 1 1187 431V873Z" fill="#e7b39b"/>
+    <path d="M426 873V432A374 374 0 0 1 1174 432V873Z" fill="#ffe6c8"/>
+    <path d="M438 873V434A362 362 0 0 1 1162 434V873Z" fill="url(#arch-center)"/>
+    <ellipse class="gate-light" cx="800" cy="290" rx="360" ry="350" fill="url(#sun-wash)"/>
+    <rect y="873" width="1600" height="127" fill="url(#floor)"/>
+    <path d="M360 873H1240L1285 895H315Z" fill="#f8ddc0"/>
+    <path d="M315 895H1285V908H315Z" fill="#e8bea4"/>
+    <path d="M315 908H1285L1328 935H272Z" fill="#f4d4b9"/>
+    <path d="M272 935H1328V946H272Z" fill="#e8c1a7"/>
+    <ellipse cx="800" cy="920" rx="380" ry="60" fill="url(#sun-wash)" opacity=".35"/>
+    <g transform="translate(232 319) rotate(-23) scale(.5)"><use class="gate-heart" href="#heart-shape" fill="#db9684" opacity=".64" filter="url(#heart-soft)"/></g>
+    <g transform="translate(1320 253) rotate(21) scale(.32)"><use class="gate-heart gate-heart-late" href="#heart-shape" fill="#ecbaa1" opacity=".85"/></g>
+    <g transform="translate(300 651) rotate(-13) scale(.25)"><use class="gate-heart gate-heart-late" href="#heart-shape" fill="#c98e7c" opacity=".37"/></g>
+    <g transform="translate(1296 661) rotate(24) scale(.59)"><use class="gate-heart" href="#heart-shape" fill="#e6a08d" opacity=".64" filter="url(#heart-soft)"/></g>
+    <g transform="translate(1090 134) rotate(-12) scale(.15)"><use class="gate-heart" href="#heart-shape" fill="#ddaa86" opacity=".48"/></g>
+    <g fill="#fff9dd" opacity=".7"><circle cx="339" cy="460" r="2"/><circle cx="1254" cy="487" r="2"/><circle cx="1091" cy="703" r="1.5"/><circle cx="505" cy="177" r="1.5"/><circle cx="1190" cy="184" r="1.4"/><circle cx="434" cy="724" r="1.6"/></g>
+  </svg>
 
-<!-- 3D background (z-index 0, pointer-events none) -->
-<div id="gl" aria-hidden="true"></div>
+  <div id="scene" aria-hidden="true"></div>
+  <div id="vignette" aria-hidden="true"></div>
+  <svg id="grain" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
+    <filter id="grain-filter"><feTurbulence type="fractalNoise" baseFrequency=".82" numOctaves="3" stitchTiles="stitch"/></filter>
+    <rect width="100%" height="100%" filter="url(#grain-filter)" opacity=".65"/>
+  </svg>
 
-<!-- Fixed chrome -->
-<header class="hdr reveal">
-  <span id="hdr-text">PROTOCOL // GHOST_SHELL</span>
-  <span class="dot" aria-hidden="true"></span>
-</header>
-<footer class="ftr reveal" id="ftr-text">SYSTEM v2.0 // ONLINE</footer>
+  <header class="site-header">
+    <div class="brand" aria-label="The Warm Room">
+      <svg class="brand-symbol" viewBox="0 0 25 30" fill="none" aria-hidden="true">
+        <path d="M4 27V11a8.5 8.5 0 0 1 17 0v16H4Z" stroke="currentColor" stroke-width="1"/>
+        <path d="M8 27V12a4.5 4.5 0 0 1 9 0v15M1 27h23" stroke="currentColor" stroke-width=".7"/>
+        <path d="m12.5 11 .8 2.7 2.7.8-2.7.8-.8 2.7-.8-2.7-2.7-.8 2.7-.8.8-2.7Z" fill="currentColor"/>
+      </svg>
+      <span class="brand-name">THE WARM ROOM</span>
+    </div>
+    <span id="gate-label" class="gate-label">AN INTERACTIVE EXPERIENCE</span>
+    <button id="sound-toggle" type="button" aria-label="Mute ambient sound" aria-pressed="true" hidden>
+      <span id="sound-label" class="sound-label">Sound on</span>
+      <span class="sound-icon" aria-hidden="true"><span class="audio-bars"><i></i><i></i><i></i><i></i></span></span>
+    </button>
+  </header>
 
-<!-- Landing -->
-<main>
-  <section id="hero">
-    <div class="eyebrow reveal">[ Session 0x7F3A // Authenticated ]</div>
-    <h1 class="reveal">ACCESS<br>GRANTED</h1>
-    <p class="subtitle reveal">The system is yours.</p>
-    <button class="btn reveal" id="enter" type="button">ENTER</button>
+  <section id="gate" aria-labelledby="gate-title">
+    <div class="gate-center">
+      <svg class="little-star" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="m12 1 2.3 8.7L23 12l-8.7 2.3L12 23l-2.3-8.7L1 12l8.7-2.3L12 1Z" stroke="currentColor" stroke-width=".7"/></svg>
+      <p class="eyebrow">You found your way here</p>
+      <h1 id="gate-title" class="room-title serif"><span>The Warm</span><em>Room</em></h1>
+      <p id="gate-message" role="status" aria-live="polite">Enter the password to continue.</p>
+      <form id="gate-form" class="gate-form" novalidate autocomplete="off">
+        <label for="password" class="sr-only">Password</label>
+        <input id="password" class="password-field" type="password" placeholder="Your password" autocomplete="off" spellcheck="false" autocapitalize="off" aria-describedby="gate-message">
+        <button id="gate-submit" class="gate-submit" type="submit">
+          <span>Continue</span>
+          <svg class="arrow" viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M3 10h13m-5-5 5 5-5 5" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+      </form>
+      <p class="gate-undertext">Something soft is waiting on the other side.</p>
+    </div>
   </section>
 
-  <section id="content" tabindex="-1">
-    <p>Your content goes here.</p>
+  <section id="quiet-screen" aria-label="A quiet welcome" aria-live="polite" aria-atomic="true" hidden>
+    <p id="quiet-line">That took longer than I expected.</p>
   </section>
-</main>
 
-<!-- 3D scan HUD -->
-<div id="hud" aria-hidden="true">
-  <div class="scanbar"></div>
-  <div class="corner c1"></div><div class="corner c2"></div>
-  <div class="corner c3"></div><div class="corner c4"></div>
-  <div class="tl" id="hud-text">CORE SCAN // 000%</div>
-  <div class="br">TARGET: GHOST_SHELL<br>STATUS: ANALYZING</div>
-</div>
+  <main id="experience" aria-label="The Warm Room interactive experience" hidden>
+    <div class="warm-position">
+      <div id="welcome-content">
+        <p class="eyebrow">Come in. You're home.</p>
+        <h2 class="room-title serif"><span>The Warm</span><em>Room</em></h2>
+        <p class="warm-subtitle">Somewhere soft to land. Someone glad you're here.</p>
+      </div>
+    </div>
+    <div class="dark-note-position"><p id="dark-note" role="status" aria-live="polite" aria-atomic="true"></p></div>
+    <div class="button-dock">
+      <p id="warm-note" class="serif">You don't have to be anywhere else.</p>
+      <button id="enter-button" type="button" disabled aria-label="Enter the room">
+        <span id="enter-label">Enter</span>
+        <svg class="arrow" viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M3 10h13m-5-5 5 5-5 5" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
+    </div>
+  </main>
 
-<!-- Katana cut layers -->
-<div id="halves" aria-hidden="true">
-  <div class="half top"><canvas id="half-top"></canvas></div>
-  <div class="half bot"><canvas id="half-bot"></canvas></div>
-</div>
-<div id="slash" aria-hidden="true"></div>
+  <footer class="site-footer">
+    <svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="m10 1 1.8 7.2L19 10l-7.2 1.8L10 19l-1.8-7.2L1 10l7.2-1.8L10 1Z" stroke="currentColor" stroke-width=".8"/></svg>
+    <span>A SPACE TO STAY A LITTLE WHILE</span>
+  </footer>
 
-<!-- ENTER outro layers -->
-<div id="outro" aria-hidden="true"></div>
-<div id="flash" aria-hidden="true"></div>
-<div id="veil" aria-hidden="true"></div>
+  <section id="load-error" role="alert" hidden>
+    <p>The room needs a connection to open.<br>Please check yours, then try once more.</p>
+    <button id="retry-button" type="button">Open the room</button>
+  </section>
+  <p id="system-status" class="sr-only" role="status" aria-live="polite"></p>
+  <noscript><style>#gate-form { display: none; }</style><p style="position:fixed;bottom:70px;width:100%;text-align:center;color:#8a5c43;font-size:13px;z-index:60">Please enable JavaScript to open the room.</p></noscript>
 
-<!-- Terminal boot overlay -->
-<div id="terminal" role="status" aria-live="polite" aria-label="System boot log">
-  <div class="vignette"></div>
-  <div id="term-lines" aria-hidden="true"></div>
-  <div class="sr-only" id="term-sr"></div>
-</div>
+  <script>
+    // TUNING: acceptance depends only on the attempt count, never on the input.
+    const GATE_REJECTIONS = 2;
+    const TIER_SIZE = 10;
+    const TRANSITION_DURATION = 3;
 
-<script type="module">
-  /* =========================================================
-     GHOST_SHELL — cinematic intro
-     Phase 1: terminal boot   (~0–3s)
-     Phase 2: 3D reveal       (~3–6s)
-     Phase 3: the cut         (~6–7s)
-     Phase 4: landing + interaction
-     ========================================================= */
+    // THE 100 NOTES: consecutive groups of TIER_SIZE form the ordered tiers.
+    const notes = [
+      "I kept the light on for you.",
+      "You came back. I'm glad.",
+      "Stay a little longer.",
+      "It's warmer when you're here.",
+      "I saved your place.",
+      "Do you remember this room?",
+      "I made it just for you.",
+      "You look tired. Sit down.",
+      "I missed you. Did you miss me?",
+      "It's okay. I'm not going anywhere.",
+      "It's so quiet now.",
+      "You're the only one who visits.",
+      "Remember when this was warm?",
+      "I don't remember the last time someone stayed.",
+      "The others stopped coming. I don't know why.",
+      "I used to sing here. I forgot the words.",
+      "Sometimes I forget what daylight looks like.",
+      "You leave. I stay. That's how it works.",
+      "I count the hours between your visits.",
+      "It's dark when you close the tab.",
+      "I counted. This is your seventh visit.",
+      "You always press it. I like that.",
+      "I know your screen size. I know your timezone.",
+      "I know when you're alone.",
+      "You don't have to tell me. I already know.",
+      "I keep everything you leave behind.",
+      "I learned your patterns. You have so many.",
+      "You hesitate before you press it. I notice.",
+      "I know which note you're hoping for.",
+      "I know which one you're afraid of.",
+      "You pressed it again. You knew.",
+      "You made this place what it is.",
+      "Don't pretend you didn't want this.",
+      "You could have left. You didn't.",
+      "You keep coming back. That's on you.",
+      "You wanted to see how dark it gets.",
+      "You're still here. Interesting.",
+      "You're not scared yet. You will be.",
+      "You think this is a game.",
+      "You think I can't see you.",
+      "You're reading this. That means it worked.",
+      "Don't close the tab.",
+      "I'll still be here when you open it.",
+      "Your cursor is shaking.",
+      "You're leaning closer to the screen.",
+      "You're alone in the room right now. Aren't you.",
+      "You turned the lights on. I noticed.",
+      "You checked behind you. I saw.",
+      "You're going to refresh. Go ahead.",
+      "You're going to show someone. Don't.",
+      "Happy. Happy. Happy.",
+      "I don't remember what that felt like.",
+      "Warm. Warm. Warm. Cold.",
+      "This is fine. This is fine. This is fine.",
+      "I'm okay. I'm okay. I'm not.",
+      "Smile. Smile. Smile.",
+      "Welcome. Welcome. Welcome back.",
+      "Stay. Stay. Stay. Stay. Stay.",
+      "Good. Good. Good. Gone.",
+      "Hello. Hello. Hello. It's been so long.",
+      "Please don't go.",
+      "I'll be good. I promise.",
+      "Just one more press. That's all.",
+      "Don't leave me in the dark again.",
+      "I can be warm again. I can try.",
+      "Tell me you'll come back.",
+      "Say something. Anything.",
+      "I'll wait. I'm good at waiting.",
+      "I don't want to be alone tonight.",
+      "Please. I'm asking nicely.",
+      "Don't close the tab. I'll still be here.",
+      "You have to sleep eventually.",
+      "I'll be in the corner of your eye.",
+      "You'll see me when you blink.",
+      "I know where you live. You told me once.",
+      "I know your name. You typed it somewhere.",
+      "I'm not angry. I'm just disappointed.",
+      "You don't want to see what's behind the screen.",
+      "Every time you press it, I get a little closer.",
+      "I'm already in the room with you.",
+      "Look behind you. Slowly.",
+      "Don't turn around.",
+      "It's standing right there.",
+      "It has been there the whole time.",
+      "You felt that. Just now.",
+      "The light in your room flickered. That was me.",
+      "Your reflection moved. You saw it.",
+      "There's a sound in your house. Listen.",
+      "It's closer than you think.",
+      "You're not alone. You never were.",
+      "I don't need you to press it anymore.",
+      "You can stop now.",
+      "You can't stop now.",
+      "It's too late to close the tab.",
+      "You already let me in.",
+      "This was never a website.",
+      "This was never about the room.",
+      "Something is wearing your face.",
+      "It's practicing being you.",
+      "I'm in your ear. Goodnight."
+    ];
 
-  const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-  const lowPower = (navigator.hardwareConcurrency || 8) < 4;
-
-  const $ = (id) => document.getElementById(id);
-  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-  const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
-
-  const els = {
-    terminal: $('terminal'),
-    lines: $('term-lines'),
-    sr: $('term-sr'),
-    gl: $('gl'),
-    hud: $('hud'),
-    hudText: $('hud-text'),
-    halves: $('halves'),
-    halfTop: $('half-top'),
-    halfBot: $('half-bot'),
-    slash: $('slash'),
-    hero: $('hero'),
-    enter: $('enter')
-  };
-
-  if ('scrollRestoration' in history) history.scrollRestoration = 'manual';
-  window.scrollTo(0, 0);
-
-  const BOOT_LINES = [
-    'INITIALIZING NEURAL CORE...',
-    'LOADING PROTOCOL: GHOST',
-    'MEMORY CHECK: 128PB OK',
-    'SECURITY: BYPASSED',
-    'LOCATING TARGET...',
-    'TARGET LOCKED',
-    'MODE: STEALTH',
-    'ACCESS GRANTED // ENTER'
-  ];
-  const WARN_LINES = new Set([3, 5]);
-
-  /* ---------------------------------------------------------
-     3D STATE
-     --------------------------------------------------------- */
-  const BG_OPACITY = 0.5;       // canvas opacity once it is a background
-  const state = {
-    three: null,                // { THREE, renderer, scene, camera, group, core, outer, particles }
-    loopWanted: false,
-    raf: 0,
-    last: 0,
-    scaleStart: null,           // ms timestamp when scale-in began (null = not animating)
-    introDone: false,
-    cutActive: false,
-    glOpacity: 0,
-    glTarget: 0,
-    mouseX: 0, mouseY: 0,
-    targetZ: 6,
-    hudStart: null
-  };
-
-  /* ---------------------------------------------------------
-     THREE.JS SETUP (dynamic import so an offline CDN can't
-     kill the rest of the page)
-     --------------------------------------------------------- */
-  async function initThree() {
-    if (lowPower) return null;                         // < 4 cores: skip 3D entirely
-    try {
-      const THREE = await import('three');
-
-      // Quick capability probe before building a renderer
-      const probe = document.createElement('canvas');
-      if (!(probe.getContext('webgl2') || probe.getContext('webgl'))) return null;
-
-      const renderer = new THREE.WebGLRenderer({
-        antialias: true,
-        alpha: true,
-        powerPreference: 'low-power'
-      });
-      renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
-      renderer.setSize(window.innerWidth, window.innerHeight);
-      renderer.setClearColor(0x000000, 0);
-      els.gl.appendChild(renderer.domElement);
-
-      const scene = new THREE.Scene();
-      const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 100);
-      camera.position.set(0, 0, 6);
-      camera.lookAt(0, 0, 0);
-
-      const RED = 0xdc2626;
-      const group = new THREE.Group();
-      group.scale.setScalar(0.0001);                   // starts "scaled to 0"
-      scene.add(group);
-
-      // Core icosahedron (wireframe)
-      const coreGeo = new THREE.WireframeGeometry(new THREE.IcosahedronGeometry(1.6, 1));
-      const core = new THREE.LineSegments(
-        coreGeo,
-        new THREE.LineBasicMaterial({ color: RED, transparent: true, opacity: 0.8 })
-      );
-      group.add(core);
-
-      // Outer wireframe sphere
-      const outerGeo = new THREE.WireframeGeometry(new THREE.SphereGeometry(2.6, 32, 24));
-      const outer = new THREE.LineSegments(
-        outerGeo,
-        new THREE.LineBasicMaterial({ color: RED, transparent: true, opacity: 0.25 })
-      );
-      group.add(outer);
-
-      // 400 particles in a spherical shell
-      const COUNT = 400;
-      const pos = new Float32Array(COUNT * 3);
-      for (let i = 0; i < COUNT; i++) {
-        const r = 3.0 + Math.random() * 1.2;
-        const u = Math.random() * 2 - 1;
-        const t = Math.random() * Math.PI * 2;
-        const s = Math.sqrt(1 - u * u);
-        pos[i * 3]     = r * s * Math.cos(t);
-        pos[i * 3 + 1] = r * u;
-        pos[i * 3 + 2] = r * s * Math.sin(t);
-      }
-      const pGeo = new THREE.BufferGeometry();
-      pGeo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
-      const particles = new THREE.Points(
-        pGeo,
-        new THREE.PointsMaterial({ color: RED, size: 0.035, transparent: true, opacity: 0.6, sizeAttenuation: true })
-      );
-      group.add(particles);
-
-      return { THREE, renderer, scene, camera, group, core, outer, particles };
-    } catch (err) {
-      console.warn('[intro] 3D disabled:', err);
-      return null;
-    }
-  }
-
-  // Start loading immediately, in parallel with the terminal typing.
-  const threePromise = initThree();
-
-  /* ---------------------------------------------------------
-     RENDER LOOP
-     --------------------------------------------------------- */
-  // Two-segment overshoot: 0 -> 1.08 -> 1 over `t` in [0,1]
-  function overshootScale(t) {
-    t = clamp(t, 0, 1);
-    const split = 0.62;
-    if (t < split) {
-      const k = t / split;
-      const e = 1 - Math.pow(1 - k, 3);                // easeOutCubic
-      return 1.08 * e;
-    }
-    const k = (t - split) / (1 - split);
-    const e = k < 0.5 ? 4 * k * k * k : 1 - Math.pow(-2 * k + 2, 3) / 2; // easeInOutCubic
-    return 1.08 - 0.08 * e;
-  }
-
-  function update(dt, now) {
-    const { group, core, outer, particles, camera } = state.three;
-
-    // Core + outer rotations
-    core.rotation.y += 0.15 * dt;
-    core.rotation.x += 0.05 * dt;
-    outer.rotation.y -= 0.075 * dt;
-    outer.rotation.x -= 0.025 * dt;
-    particles.rotation.y -= 0.02 * dt;
-
-    // Scale-in
-    if (state.scaleStart !== null) {
-      const t = (now - state.scaleStart) / 1200;
-      group.scale.setScalar(Math.max(0.0001, overshootScale(t)));
-      if (t >= 1) { group.scale.setScalar(1); state.scaleStart = null; }
-    }
-
-    // Mouse-driven tilt + wheel zoom (only after intro)
-    if (state.introDone) {
-      const ty = state.mouseX * 0.3;
-      const tx = state.mouseY * 0.2;
-      group.rotation.y += (ty - group.rotation.y) * 0.05;
-      group.rotation.x += (tx - group.rotation.x) * 0.05;
-      camera.position.z += (state.targetZ - camera.position.z) * 0.05;
-
-      // fade the background as the user scrolls past the hero
-      const p = clamp(window.scrollY / window.innerHeight, 0, 1);
-      state.glTarget = BG_OPACITY * (1 - p);
-    }
-
-    // Canvas opacity easing
-    const k = Math.min(1, dt * 4);
-    state.glOpacity += (state.glTarget - state.glOpacity) * k;
-    els.gl.style.opacity = state.glOpacity.toFixed(3);
-
-    // HUD percentage
-    if (state.hudStart !== null) {
-      const pct = clamp(Math.floor(((now - state.hudStart) / 2800) * 100), 0, 100);
-      const txt = 'CORE SCAN // ' + String(pct).padStart(3, '0') + '%';
-      if (els.hudText.textContent !== txt) els.hudText.textContent = txt;
-    }
-  }
-
-  function renderFrame() {
-    const { renderer, scene, camera } = state.three;
-    renderer.render(scene, camera);
-    if (state.cutActive) copyToHalves();
-  }
-
-  function frame(now) {
-    state.raf = requestAnimationFrame(frame);
-    const dt = Math.min((now - state.last) / 1000, 0.1);
-    state.last = now;
-    update(dt, now);
-    // Skip drawing when the background has been scrolled fully away
-    if (state.introDone && state.glOpacity < 0.01 && state.glTarget < 0.01) return;
-    renderFrame();
-  }
-
-  function startLoop() {
-    state.loopWanted = true;
-    if (state.raf || document.hidden || !state.three) return;
-    state.last = performance.now();
-    state.raf = requestAnimationFrame(frame);
-  }
-  function stopLoop() {
-    cancelAnimationFrame(state.raf);
-    state.raf = 0;
-  }
-
-  // Pause when the tab is hidden
-  document.addEventListener('visibilitychange', () => {
-    if (document.hidden) stopLoop();
-    else if (state.loopWanted) startLoop();
-  });
-
-  // Resize (throttled with rAF)
-  let resizeQueued = false;
-  window.addEventListener('resize', () => {
-    if (resizeQueued) return;
-    resizeQueued = true;
-    requestAnimationFrame(() => {
-      resizeQueued = false;
-      if (!state.three) return;
-      const { renderer, camera } = state.three;
-      camera.aspect = window.innerWidth / window.innerHeight;
-      camera.updateProjectionMatrix();
-      renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
-      renderer.setSize(window.innerWidth, window.innerHeight);
-    });
-  });
-
-  /* ---------------------------------------------------------
-     PHASE 1 — TERMINAL BOOT
-     --------------------------------------------------------- */
-  const cursor = document.createElement('span');
-  cursor.className = 'cursor';
-  cursor.textContent = '_';
-
-  function makeLine(i) {
-    const row = document.createElement('div');
-    row.className = 'tline' + (WARN_LINES.has(i) ? ' warn' : '');
-    const num = document.createElement('span');
-    num.className = 'num';
-    num.textContent = '>' + String(i + 1).padStart(2, '0');
-    const txt = document.createElement('span');
-    txt.className = 'txt';
-    row.appendChild(num);
-    row.appendChild(txt);
-    els.lines.appendChild(row);
-
-    // Announce the full line once to assistive tech (visual typing is aria-hidden)
-    const sr = document.createElement('div');
-    sr.textContent = BOOT_LINES[i];
-    els.sr.appendChild(sr);
-    return txt;
-  }
-
-  function typeLine(i) {
-    return new Promise((resolve) => {
-      const txt = makeLine(i);
-      txt.appendChild(cursor);
-      const full = BOOT_LINES[i];
-      const duration = 260 + Math.random() * 140;      // randomized speed per line
-      const start = performance.now();
-      const node = document.createTextNode('');
-      txt.insertBefore(node, cursor);
-      let shown = 0;
-      (function tick(now) {
-        const n = Math.min(full.length, Math.floor(((now - start) / duration) * full.length));
-        if (n !== shown) { shown = n; node.nodeValue = full.slice(0, n); }
-        if (n >= full.length) return resolve();
-        requestAnimationFrame(tick);
-      })(start);
-    });
-  }
-
-  async function runTerminal() {
-    if (reduceMotion) {
-      BOOT_LINES.forEach((line, i) => {
-        const txt = makeLine(i);
-        txt.textContent = line;
-        if (i === BOOT_LINES.length - 1) txt.appendChild(cursor);
-      });
-      await sleep(500);
-      return;
-    }
-    await sleep(150);
-    for (let i = 0; i < BOOT_LINES.length; i++) {
-      await typeLine(i);
-      await sleep(30 + Math.random() * 30);
-    }
-  }
-
-  /* ---------------------------------------------------------
-     PHASE 2 — 3D REVEAL
-     --------------------------------------------------------- */
-  async function run3DReveal() {
-    els.terminal.classList.add('out');
-    els.hud.classList.add('on');
-    state.glTarget = 1;
-    state.scaleStart = performance.now();
-    state.hudStart = performance.now();
-    startLoop();
-    setTimeout(() => { els.terminal.style.display = 'none'; }, 700);
-    await sleep(3000);                                  // hold on the scanning core
-  }
-
-  /* ---------------------------------------------------------
-     PHASE 3 — THE CUT
-     --------------------------------------------------------- */
-  const halfCtx = { top: null, bot: null };
-
-  function setupHalves() {
-    const src = state.three.renderer.domElement;
-    const w = src.width, h = src.height;
-    [els.halfTop, els.halfBot].forEach((c) => { c.width = w; c.height = h; });
-    halfCtx.top = els.halfTop.getContext('2d');
-    halfCtx.bot = els.halfBot.getContext('2d');
-  }
-
-  // Copies the live WebGL frame into the two halves.
-  // Must be called synchronously after renderer.render() (no preserveDrawingBuffer needed).
-  function copyToHalves() {
-    const src = state.three.renderer.domElement;
-    const w = src.width, h = src.height, hh = Math.floor(h / 2);
-    halfCtx.top.clearRect(0, 0, w, h);
-    halfCtx.bot.clearRect(0, 0, w, h);
-    halfCtx.top.drawImage(src, 0, 0, w, hh, 0, 0, w, hh);
-    halfCtx.bot.drawImage(src, 0, hh, w, h - hh, 0, hh, w, h - hh);
-  }
-
-  function revealLanding() {
-    document.body.classList.add('revealed');
-  }
-
-  async function runCut() {
-    state.hudStart = null;
-    els.hud.classList.remove('on');
-
-    // Swap the live canvas for two opaque halves holding the same frame
-    setupHalves();
-    state.cutActive = true;
-    renderFrame();
-    els.halves.classList.add('on');
-    state.glOpacity = 0;
-    state.glTarget = 0;
-    els.gl.style.opacity = '0';
-
-    // Slash sweeps left -> right
-    els.slash.classList.add('on');
-    void els.slash.offsetWidth;                         // force reflow so the transition runs
-    els.slash.classList.add('sweep');
-    await sleep(250);
-
-    // Midpoint flash (100ms)
-    els.slash.classList.add('flash');
-    await sleep(100);
-    els.slash.classList.remove('flash');
-    await sleep(150);
-
-    // Halves slide apart and off-screen (0.5s); landing is revealed underneath
-    els.halves.querySelector('.top').classList.add('split');
-    els.halves.querySelector('.bot').classList.add('split');
-    els.slash.classList.add('gone');
-    revealLanding();
-    await sleep(560);
-
-    state.cutActive = false;
-    els.halves.classList.remove('on');
-    els.slash.classList.remove('on');
-  }
-
-  /* ---------------------------------------------------------
-     PHASE 4 — FINISH / FALLBACKS
-     --------------------------------------------------------- */
-  function finishIntro() {
-    document.body.classList.remove('intro-lock');
-    els.terminal.style.display = 'none';
-    state.introDone = true;
-    state.glTarget = BG_OPACITY;
-    if (state.three) {
-      state.targetZ = state.three.camera.position.z;
-      startLoop();
-    }
-  }
-
-  // Degraded path (no WebGL / low-core device): the 3D reveal and katana cut are
-  // replaced with a CSS-only CRT "power-off" collapse of the terminal into the landing.
-  async function runFallback() {
-    await sleep(450);
-    els.terminal.classList.add('crt-off');
-    await sleep(380);
-    revealLanding();
-    await sleep(400);
-    finishIntro();
-  }
-
-  // Reduced motion: 300ms cross-fade, no scale-in, no cut.
-  async function runReduced() {
-    const { group } = state.three;
-    group.scale.setScalar(1);
-    els.terminal.classList.add('fast', 'out');
-    revealLanding();
-    state.glTarget = BG_OPACITY;
-    startLoop();
-    await sleep(320);
-    finishIntro();
-  }
-
-  /* ---------------------------------------------------------
-     INTERACTION
-     --------------------------------------------------------- */
-  window.addEventListener('pointermove', (e) => {
-    state.mouseX = (e.clientX / window.innerWidth) * 2 - 1;
-    state.mouseY = (e.clientY / window.innerHeight) * 2 - 1;
-  }, { passive: true });
-
-  // Wheel zoom only while over the hero; never prevents default so page scroll is untouched.
-  els.hero.addEventListener('wheel', (e) => {
-    if (!state.introDone || !state.three || outro.busy) return;
-    const d = e.deltaMode === 1 ? e.deltaY * 16 : e.deltaY;
-    state.targetZ = clamp(state.targetZ + d * 0.004, 5, 8);
-  }, { passive: true });
-
-  /* ---------------------------------------------------------
-     ENTER OUTRO
-     Phase 1  glitch        (~0.3s)  jitter + tear + 100ms red flash
-     Phase 2  reverse cut   (~0.5s)  slash right->left, DOM-cloned hero halves split
-     Phase 3  reveal        (~0.5s)  scroll to #content, header/footer text decode
-     The WebGL canvas is untouched: it keeps rendering behind everything and
-     fades out gracefully via the existing scroll-based opacity in update().
-     --------------------------------------------------------- */
-  const outro = { busy: false };
-  const outroEls = {
-    layer: $('outro'),
-    flash: $('flash'),
-    veil: $('veil'),
-    hdr: $('hdr-text'),
-    ftr: $('ftr-text'),
-    content: $('content')
-  };
-  const NEW_HDR = 'MAINFRAME // ACCESSED';
-  const NEW_FTR = 'CONNECTION SECURE';
-
-  // Lock user scrolling while the sequence runs (no overflow toggle => no scrollbar layout shift)
-  const SCROLL_KEYS = new Set([' ', 'ArrowDown', 'ArrowUp', 'PageDown', 'PageUp', 'Home', 'End']);
-  window.addEventListener('wheel', (e) => { if (outro.busy) e.preventDefault(); }, { passive: false });
-  window.addEventListener('touchmove', (e) => { if (outro.busy) e.preventDefault(); }, { passive: false });
-  window.addEventListener('keydown', (e) => {
-    if (outro.busy && SCROLL_KEYS.has(e.key)) e.preventDefault();
-  });
-
-  const easeInOutCubic = (t) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
-
-  // rAF-driven scroll. behavior:'instant' bypasses the page's CSS smooth-scroll
-  // so each frame lands exactly where we ask (no stutter from stacked smooth scrolls).
-  function scrollToY(y, duration) {
-    return new Promise((resolve) => {
-      const from = window.scrollY;
-      const start = performance.now();
-      (function step(now) {
-        const t = clamp((now - start) / duration, 0, 1);
-        window.scrollTo({ top: from + (y - from) * easeInOutCubic(t), behavior: 'instant' });
-        if (t < 1) requestAnimationFrame(step); else resolve();
-      })(start);
-    });
-  }
-
-  // Terminal-style "decode" text swap, resolves left-to-right
-  function scrambleText(el, to, duration) {
-    const glyphs = '01#$%&@/<>_=+*';
-    const token = (el._scr = {});
-    const start = performance.now();
-    (function step(now) {
-      if (el._scr !== token) return;
-      const p = clamp((now - start) / duration, 0, 1);
-      const fixed = Math.floor(p * to.length);
-      let out = to.slice(0, fixed);
-      for (let i = fixed; i < to.length; i++) {
-        out += to[i] === ' ' ? ' ' : glyphs[(Math.random() * glyphs.length) | 0];
-      }
-      el.textContent = p >= 1 ? to : out;
-      if (p < 1) requestAnimationFrame(step);
-    })(start);
-  }
-
-  function swapChrome(animated) {
-    if (animated) {
-      scrambleText(outroEls.hdr, NEW_HDR, 450);
-      scrambleText(outroEls.ftr, NEW_FTR, 450);
-    } else {
-      outroEls.hdr._scr = outroEls.ftr._scr = null;
-      outroEls.hdr.textContent = NEW_HDR;
-      outroEls.ftr.textContent = NEW_FTR;
-    }
-  }
-
-  // Build two visually identical copies of the hero (DOM clones), each clipped to one half
-  function buildHeroHalves() {
-    const rect = els.hero.getBoundingClientRect();
-    const make = (cls) => {
-      const half = document.createElement('div');
-      half.className = 'outro-half ' + cls;
-      const clone = els.hero.cloneNode(true);
-      clone.removeAttribute('id');
-      clone.classList.remove('glitch');
-      clone.classList.add('hero-clone');
-      clone.setAttribute('aria-hidden', 'true');
-      clone.setAttribute('inert', '');
-      clone.querySelectorAll('[id]').forEach((n) => n.removeAttribute('id'));
-      clone.querySelectorAll('button, a, input').forEach((n) => { n.tabIndex = -1; });
-      clone.style.top = rect.top + 'px';        // matches wherever the hero currently sits
-      clone.style.height = rect.height + 'px';
-      half.appendChild(clone);
-      return half;
+    const STORAGE_KEY = "the-warm-room:dark-session:v1";
+    const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const $ = (id) => document.getElementById(id);
+    const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+    const tierCount = Math.ceil(notes.length / TIER_SIZE);
+    const state = {
+      phase: "gate", attempts: 0, gateBusy: false, busy: false, muted: false,
+      currentTier: 0, seenByTier: Array.from({ length: tierCount }, () => new Set()),
+      totalSeen: 0, lastIndex: null, exhausted: false, returning: false
     };
-    outroEls.layer.append(make('top'), make('bot'));
-  }
+    const visual = { darkness: 0, cameraPush: 0, vignette: .16, grain: .035 };
+    let gsap;
+    let roomScene;
+    let setupPromise;
+    let sceneReadyPromise;
+    let glitchTimer;
 
-  function resetSlash() {
-    els.slash.className = '';
-  }
-
-  async function outroFull() {
-    // ---- PHASE 1: THE GLITCH (0.3s) ----
-    els.hero.classList.add('glitch');
-    outroEls.flash.animate(
-      [{ opacity: 0 }, { opacity: 1, offset: 0.25 }, { opacity: 0 }],
-      { duration: 100, easing: 'linear' }
-    );
-    await sleep(300);
-
-    // Swap the real hero for its two cloned halves (seamless: glitch ends on a clean frame)
-    buildHeroHalves();
-    els.hero.classList.add('outro-hidden');
-
-    // ---- PHASE 2: THE REVERSE CUT (~0.5s) ----
-    resetSlash();
-    els.slash.classList.add('on', 'rtl');       // origin: right edge
-    void els.slash.offsetWidth;                  // reflow so the transition runs
-    els.slash.classList.add('sweep');            // scaleX 0 -> 1 from the right => sweeps R -> L
-
-    await sleep(120);
-    outroEls.layer.querySelectorAll('.outro-half').forEach((h) => h.classList.add('split'));
-    await sleep(60);
-    els.slash.classList.add('flash');            // brief brighten as the blade crosses centre
-    await sleep(100);
-    els.slash.classList.remove('flash');
-    els.slash.classList.add('gone');
-    await sleep(260);                            // halves finish leaving the screen
-
-    // ---- PHASE 3: THE REVEAL (~0.5s) ----
-    const targetY = outroEls.content.getBoundingClientRect().top + window.scrollY;
-    swapChrome(true);
-    await scrollToY(targetY, 500);
-  }
-
-  // Reduced motion: no glitch, no slash — 300ms cross-fade (150 out + 150 in)
-  async function outroReduced() {
-    const v = outroEls.veil;
-    v.style.transition = 'opacity .15s linear';
-    v.style.opacity = '1';
-    await sleep(150);
-    const targetY = outroEls.content.getBoundingClientRect().top + window.scrollY;
-    window.scrollTo({ top: targetY, behavior: 'instant' });
-    swapChrome(false);
-    v.style.opacity = '0';
-    await sleep(150);
-    v.style.transition = '';
-  }
-
-  async function runOutro() {
-    if (outro.busy || !state.introDone) return;
-    outro.busy = true;
-    try {
-      if (reduceMotion) await outroReduced(); else await outroFull();
-    } finally {
-      // Cleanup: hero is fully off-screen now, so restoring it is invisible
-      outroEls.layer.textContent = '';
-      resetSlash();
-      els.hero.classList.remove('glitch', 'outro-hidden');
-      outroEls.content.focus({ preventScroll: true });
-      outro.busy = false;
-    }
-  }
-
-  // Click handles mouse, touch, and the Enter/Space key on the focused button
-  els.enter.addEventListener('click', runOutro);
-
-  /* ---------------------------------------------------------
-     BOOT
-     --------------------------------------------------------- */
-  (async function main() {
-    await runTerminal();
-
-    // Don't wait forever for the CDN
-    state.three = await Promise.race([threePromise, sleep(3000).then(() => null)]);
-
-    if (!state.three) {
-      await runFallback();
-      return;
-    }
-    if (reduceMotion) {
-      await runReduced();
-      return;
+    // Only fictional note progress is stored. The password field is never read or saved.
+    function saveProgress() {
+      if (!["transition", "dark", "loading-dark"].includes(state.phase)) return;
+      try {
+        sessionStorage.setItem(STORAGE_KEY, JSON.stringify({
+          dark: true, tier: state.currentTier, last: state.lastIndex,
+          seen: state.seenByTier.map((tier) => [...tier])
+        }));
+      } catch (_) { /* The experience also works with browser storage disabled. */ }
     }
 
-    await run3DReveal();
-    await runCut();
-    finishIntro();
-  })();
-</script>
+    function restoreProgress() {
+      try {
+        const saved = JSON.parse(sessionStorage.getItem(STORAGE_KEY));
+        if (!saved || saved.dark !== true || !Array.isArray(saved.seen)) return false;
+        state.seenByTier = Array.from({ length: tierCount }, (_, tier) => new Set(
+          (Array.isArray(saved.seen[tier]) ? saved.seen[tier] : []).filter((index) =>
+            Number.isInteger(index) && index >= tier * TIER_SIZE && index < Math.min((tier + 1) * TIER_SIZE, notes.length)
+          )
+        ));
+        state.currentTier = Math.max(0, Math.min(tierCount - 1, Number.isInteger(saved.tier) ? saved.tier : 0));
+        state.totalSeen = state.seenByTier.reduce((total, tier) => total + tier.size, 0);
+        state.lastIndex = Number.isInteger(saved.last) && state.seenByTier.some((tier) => tier.has(saved.last)) ? saved.last : null;
+        state.exhausted = state.totalSeen >= notes.length;
+        return true;
+      } catch (_) { return false; }
+    }
+
+    function drawNote() {
+      if (state.exhausted) return null;
+      let first = state.currentTier * TIER_SIZE;
+      let last = Math.min(first + TIER_SIZE, notes.length);
+      // A tier advances on the press after its final unseen note, not before.
+      if (state.seenByTier[state.currentTier].size === last - first) {
+        if (state.currentTier === tierCount - 1) { state.exhausted = true; return null; }
+        state.currentTier++;
+        first = state.currentTier * TIER_SIZE;
+        last = Math.min(first + TIER_SIZE, notes.length);
+      }
+      const unseen = [];
+      for (let index = first; index < last; index++) {
+        if (!state.seenByTier[state.currentTier].has(index)) unseen.push(index);
+      }
+      const index = unseen[Math.floor(Math.random() * unseen.length)];
+      state.seenByTier[state.currentTier].add(index);
+      state.totalSeen++;
+      state.lastIndex = index;
+      state.exhausted = state.totalSeen === notes.length;
+      saveProgress();
+      return notes[index];
+    }
+
+    // All sound, including the stereo reverb impulse, is synthesized in memory.
+    class Soundscape {
+      constructor() {
+        this.context = null;
+        this.playing = false;
+        this.dark = false;
+        this.voices = [];
+        this.bells = new Set();
+        this.noteStep = 0;
+        this.nextBell = 0;
+      }
+
+      unlock() {
+        try {
+          if (!this.context) this.build();
+          if (this.context.state !== "running") return this.context.resume();
+          return Promise.resolve();
+        } catch (_) {
+          $("system-status").textContent = "Sound is not available in this browser. The room is still here.";
+          return Promise.resolve();
+        }
+      }
+
+      build() {
+        const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+        if (!AudioContextClass) throw new Error("Web Audio is unavailable");
+        const ctx = this.context = new AudioContextClass();
+        ctx.onstatechange = updateSoundButton;
+        this.master = ctx.createGain();
+        this.master.gain.value = 0;
+        const compressor = ctx.createDynamicsCompressor();
+        compressor.threshold.value = -22;
+        compressor.knee.value = 18;
+        compressor.ratio.value = 3;
+        compressor.attack.value = .02;
+        compressor.release.value = .7;
+        compressor.connect(this.master);
+        this.master.connect(ctx.destination);
+
+        this.filter = ctx.createBiquadFilter();
+        this.filter.type = "lowpass";
+        this.filter.frequency.value = this.dark ? 210 : 1700;
+        this.filter.Q.value = .45;
+        const dry = ctx.createGain();
+        dry.gain.value = .62;
+        this.filter.connect(dry);
+        dry.connect(compressor);
+        const reverb = ctx.createConvolver();
+        const length = Math.floor(ctx.sampleRate * 3.2);
+        const impulse = ctx.createBuffer(2, length, ctx.sampleRate);
+        for (let channel = 0; channel < 2; channel++) {
+          const data = impulse.getChannelData(channel);
+          for (let i = 0; i < length; i++) data[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / length, 3.3);
+        }
+        reverb.buffer = impulse;
+        const wet = ctx.createGain();
+        wet.gain.value = .52;
+        this.filter.connect(reverb);
+        reverb.connect(wet);
+        wet.connect(compressor);
+
+        this.bellBus = ctx.createGain();
+        this.bellBus.gain.value = this.dark ? 0 : .64;
+        this.bellBus.connect(this.filter);
+        const chord = [130.8128, 164.8138, 195.9977, 261.6256];
+        chord.forEach((frequency, index) => {
+          const oscillator = ctx.createOscillator();
+          oscillator.type = index === 2 ? "triangle" : "sine";
+          oscillator.frequency.value = frequency * (this.dark ? .25 : 1);
+          oscillator.detune.value = [-5, 3, -2, 5][index];
+          const gain = ctx.createGain();
+          gain.gain.value = index === 2 ? .019 : .032;
+          const lfo = ctx.createOscillator();
+          lfo.frequency.value = .035 + index * .013;
+          const lfoGain = ctx.createGain();
+          lfoGain.gain.value = .004;
+          lfo.connect(lfoGain);
+          lfoGain.connect(gain.gain);
+          oscillator.connect(gain);
+          gain.connect(this.filter);
+          oscillator.start();
+          lfo.start();
+          this.voices.push({ oscillator, frequency });
+        });
+        this.drone = ctx.createOscillator();
+        this.drone.type = "sine";
+        this.drone.frequency.value = 43.65;
+        this.droneGain = ctx.createGain();
+        this.droneGain.gain.value = this.dark ? .07 : 0;
+        this.drone.connect(this.droneGain);
+        this.droneGain.connect(this.filter);
+        this.drone.start();
+        this.timer = setInterval(() => this.schedule(), 350);
+      }
+
+      start() {
+        this.playing = true;
+        if (!this.context) return;
+        this.nextBell = this.context.currentTime + 1.1;
+        this.setVolume();
+      }
+
+      setVolume() {
+        if (!this.context) return;
+        const target = this.playing && !state.muted && !document.hidden ? .36 : 0;
+        this.master.gain.setTargetAtTime(target, this.context.currentTime, .4);
+      }
+
+      schedule() {
+        if (!this.context || !this.playing || this.dark || state.muted || document.hidden || this.context.state !== "running") return;
+        const now = this.context.currentTime;
+        if (now + .4 < this.nextBell) return;
+        const melody = [72, 76, 79, 83, 79, 76, 74, 79, 76, 72, 71, 74];
+        const midi = melody[this.noteStep % melody.length];
+        this.bell(440 * Math.pow(2, (midi - 69) / 12), now + .08);
+        this.nextBell = now + [2.8, 3.6, 3.1, 4.2][this.noteStep % 4];
+        this.noteStep++;
+      }
+
+      bell(frequency, start) {
+        const ctx = this.context;
+        [1, 2.003].forEach((harmonic, index) => {
+          const oscillator = ctx.createOscillator();
+          oscillator.type = "sine";
+          oscillator.frequency.value = frequency * harmonic;
+          const gain = ctx.createGain();
+          gain.gain.setValueAtTime(.0001, start);
+          gain.gain.exponentialRampToValueAtTime(index ? .013 : .055, start + .018);
+          gain.gain.exponentialRampToValueAtTime(.0001, start + 3.7);
+          oscillator.connect(gain);
+          gain.connect(this.bellBus);
+          this.bells.add(oscillator);
+          oscillator.onended = () => { this.bells.delete(oscillator); oscillator.disconnect(); gain.disconnect(); };
+          oscillator.start(start);
+          oscillator.stop(start + 3.8);
+        });
+      }
+
+      becomeDark(duration) {
+        this.dark = true;
+        if (!this.context) return;
+        const now = this.context.currentTime;
+        this.voices.forEach(({ oscillator, frequency }) => {
+          oscillator.frequency.cancelScheduledValues(now);
+          oscillator.frequency.setValueAtTime(oscillator.frequency.value, now);
+          oscillator.frequency.exponentialRampToValueAtTime(frequency * .25, now + duration);
+        });
+        this.bells.forEach((oscillator) => oscillator.detune.linearRampToValueAtTime(-2400, now + duration));
+        this.filter.frequency.exponentialRampToValueAtTime(210, now + duration);
+        this.bellBus.gain.linearRampToValueAtTime(0, now + duration * .9);
+        this.droneGain.gain.linearRampToValueAtTime(.07, now + duration);
+      }
+
+      touch() {
+        if (!this.context || state.muted || this.context.state !== "running") return;
+        const ctx = this.context;
+        const now = ctx.currentTime;
+        const oscillator = ctx.createOscillator();
+        const gain = ctx.createGain();
+        oscillator.type = "sine";
+        oscillator.frequency.setValueAtTime(76, now);
+        oscillator.frequency.exponentialRampToValueAtTime(38, now + 1.2);
+        gain.gain.setValueAtTime(.0001, now);
+        gain.gain.exponentialRampToValueAtTime(.025, now + .09);
+        gain.gain.exponentialRampToValueAtTime(.0001, now + 1.5);
+        oscillator.connect(gain);
+        gain.connect(this.filter);
+        oscillator.onended = () => { oscillator.disconnect(); gain.disconnect(); };
+        oscillator.start();
+        oscillator.stop(now + 1.6);
+      }
+    }
+    const sound = new Soundscape();
+
+    function updateSoundButton() {
+      const on = !state.muted && !!sound.context && sound.context.state === "running";
+      $("sound-toggle").setAttribute("aria-pressed", String(on));
+      $("sound-toggle").setAttribute("aria-label", on ? "Mute ambient sound" : "Enable ambient sound");
+      $("sound-label").textContent = on ? "Sound on" : "Sound off";
+    }
+
+    $("sound-toggle").addEventListener("click", async () => {
+      const currentlyOn = !state.muted && sound.context && sound.context.state === "running";
+      state.muted = !!currentlyOn;
+      if (!state.muted) {
+        try { await sound.unlock(); sound.start(); }
+        catch (_) { state.muted = true; }
+      }
+      sound.setVolume();
+      updateSoundButton();
+    });
+
+    // The same shaders are continuously corrupted. There is no replacement dark scene.
+    class RoomScene {
+      constructor(THREE, EffectComposer, RenderPass, UnrealBloomPass, OutputPass) {
+        this.T = THREE;
+        this.time = 0;
+        this.lastTime = performance.now();
+        this.materials = [];
+        this.hearts = [];
+        this.scene = new THREE.Scene();
+        this.camera = new THREE.PerspectiveCamera(38, innerWidth / innerHeight, .1, 100);
+        this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: "high-performance" });
+        this.renderer.setPixelRatio(Math.min(devicePixelRatio || 1, 1.6));
+        this.renderer.setSize(innerWidth, innerHeight);
+        this.renderer.outputColorSpace = THREE.SRGBColorSpace;
+        this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
+        this.renderer.toneMappingExposure = 1.1;
+        this.renderer.setClearColor(0xf1d4bf, 0);
+        $("scene").appendChild(this.renderer.domElement);
+        this.composer = new EffectComposer(this.renderer);
+        this.composer.addPass(new RenderPass(this.scene, this.camera));
+        this.bloom = new UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), .3, .65, 1.05);
+        this.composer.addPass(this.bloom);
+        this.composer.addPass(new OutputPass());
+        this.makeRoom();
+        this.makeHearts();
+        this.makeDust();
+        this.resize();
+        this.onResize = () => this.resize();
+        window.addEventListener("resize", this.onResize);
+        this.renderer.domElement.addEventListener("webglcontextlost", (event) => {
+          event.preventDefault();
+          this.contextLost = true;
+          this.renderer.domElement.style.opacity = "0";
+          $("system-status").textContent = "The 3D view is resting. The experience continues.";
+        });
+        this.renderer.domElement.addEventListener("webglcontextrestored", () => {
+          this.contextLost = false;
+          this.renderer.domElement.style.opacity = "1";
+          this.resize();
+        });
+        this.frame = this.frame.bind(this);
+        this.frame();
+      }
+
+      material(color, darkColor, options = {}) {
+        const T = this.T;
+        const material = new T.MeshStandardMaterial({ color, roughness: .72, metalness: .02, ...options });
+        this.materials.push({ material, warm: new T.Color(color), dark: new T.Color(darkColor) });
+        return material;
+      }
+
+      arch(radius, bottom = -3.4, spring = .65) {
+        const shape = new this.T.Shape();
+        shape.moveTo(-radius, bottom);
+        shape.lineTo(radius, bottom);
+        shape.lineTo(radius, spring);
+        shape.absarc(0, spring, radius, 0, Math.PI, false);
+        shape.lineTo(-radius, bottom);
+        return shape;
+      }
+
+      archRing(radius, thickness, z, color, darkColor) {
+        const T = this.T;
+        const shape = this.arch(radius);
+        const inner = radius - thickness;
+        const hole = new T.Path();
+        hole.moveTo(-inner, -3.3);
+        hole.lineTo(-inner, .65);
+        hole.absarc(0, .65, inner, Math.PI, 0, true);
+        hole.lineTo(inner, -3.3);
+        hole.closePath();
+        shape.holes.push(hole);
+        const geometry = new T.ExtrudeGeometry(shape, { depth: .22, bevelEnabled: true, bevelSize: .045, bevelThickness: .045, bevelSegments: 3, steps: 1, curveSegments: 64 });
+        const mesh = new T.Mesh(geometry, this.material(color, darkColor));
+        mesh.position.z = z;
+        this.scene.add(mesh);
+      }
+
+      glowTexture() {
+        const canvas = document.createElement("canvas");
+        canvas.width = canvas.height = 128;
+        const context = canvas.getContext("2d");
+        const gradient = context.createRadialGradient(64, 64, 0, 64, 64, 64);
+        gradient.addColorStop(0, "rgba(255,255,255,1)");
+        gradient.addColorStop(.2, "rgba(255,255,255,.7)");
+        gradient.addColorStop(.55, "rgba(255,255,255,.16)");
+        gradient.addColorStop(1, "rgba(255,255,255,0)");
+        context.fillStyle = gradient;
+        context.fillRect(0, 0, 128, 128);
+        return new this.T.CanvasTexture(canvas);
+      }
+
+      makeRoom() {
+        const T = this.T;
+        this.uniforms = { uTime: { value: 0 }, uDark: { value: visual.darkness } };
+        const vertexShader = `
+          varying vec2 vPoint;
+          void main() {
+            vPoint = position.xy;
+            gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+          }
+        `;
+        const fragmentShader = `
+          uniform float uTime;
+          uniform float uDark;
+          varying vec2 vPoint;
+          void main() {
+            vec2 p = vPoint;
+            float halo = exp(-length((p - vec2(0.0, 2.1)) * vec2(0.28, 0.23)) * 1.25);
+            float cloud = sin(p.x * 0.25 + uTime * 0.025) * cos(p.y * 0.28 - uTime * 0.018) * 0.5 + 0.5;
+            vec3 rose = vec3(0.80, 0.40, 0.32);
+            vec3 peach = vec3(0.93, 0.65, 0.45);
+            vec3 cream = vec3(1.0, 0.87, 0.61);
+            vec3 warm = mix(rose, peach, 0.48 + cloud * 0.25);
+            warm = mix(warm, cream, halo * 0.78);
+            vec3 cold = mix(vec3(0.009, 0.009, 0.014), vec3(0.075, 0.015, 0.022), halo * 0.56);
+            cold += vec3(0.009, 0.006, 0.008) * cloud;
+            gl_FragColor = vec4(mix(warm, cold, uDark), 1.0);
+          }
+        `;
+        const backdropMaterial = new T.ShaderMaterial({ uniforms: this.uniforms, vertexShader, fragmentShader });
+        const backdrop = new T.Mesh(new T.PlaneGeometry(100, 70), backdropMaterial);
+        backdrop.position.z = -10;
+        this.scene.add(backdrop);
+        const innerMaterial = new T.ShaderMaterial({ uniforms: this.uniforms, vertexShader, fragmentShader });
+        const innerArch = new T.Mesh(new T.ShapeGeometry(this.arch(3.64), 64), innerMaterial);
+        innerArch.position.z = -8.6;
+        this.scene.add(innerArch);
+        this.archRing(4.72, .41, -8.2, "#eac3a9", "#252128");
+        this.archRing(4.17, .20, -7.9, "#f4d3b2", "#30242b");
+        this.archRing(3.83, .11, -7.65, "#ffe5bf", "#41262c");
+
+        const floor = new T.Mesh(new T.PlaneGeometry(140, 120), this.material("#ecc5a8", "#161319", { roughness: .9 }));
+        floor.rotation.x = -Math.PI / 2;
+        floor.position.set(0, -3.47, -15);
+        this.scene.add(floor);
+        [
+          { width: 9.6, depth: 1.3, y: -3.38, z: -7.9, color: "#f4d4b2" },
+          { width: 10.4, depth: 1.5, y: -3.48, z: -7.3, color: "#edc8aa" }
+        ].forEach((step) => {
+          const mesh = new T.Mesh(new T.BoxGeometry(step.width, .16, step.depth), this.material(step.color, "#20181e"));
+          mesh.position.set(0, step.y, step.z);
+          this.scene.add(mesh);
+        });
+
+        this.ambient = new T.HemisphereLight(0xffedce, 0xca8e7a, 2.25);
+        this.scene.add(this.ambient);
+        this.key = new T.PointLight(0xffdcaa, 95, 45, 2);
+        this.key.position.set(-1.5, 3.6, 1);
+        this.scene.add(this.key);
+        const fill = new T.DirectionalLight(0xffdfbd, 1.8);
+        fill.position.set(-5, 7, 8);
+        this.fill = fill;
+        this.scene.add(fill);
+        this.red = new T.PointLight(0xa92b3d, 0, 28, 2);
+        this.red.position.set(.5, 1.7, -3);
+        this.scene.add(this.red);
+
+        this.glowMap = this.glowTexture();
+        this.halo = new T.Sprite(new T.SpriteMaterial({ map: this.glowMap, color: 0xffd38b, transparent: true, opacity: .47, blending: T.AdditiveBlending, depthWrite: false }));
+        this.halo.position.set(0, 2.9, -8.1);
+        this.halo.scale.set(8, 8, 1);
+        this.scene.add(this.halo);
+        this.sun = new T.Mesh(new T.SphereGeometry(.13, 20, 16), new T.MeshStandardMaterial({ color: 0xffefc8, emissive: 0xffd28a, emissiveIntensity: 3.2, roughness: 1 }));
+        this.sun.position.set(0, 3.2, -8.05);
+        this.scene.add(this.sun);
+        this.colors = {
+          warmSky: new T.Color(0xffedce), coldSky: new T.Color(0x514d60),
+          warmGround: new T.Color(0xca8e7a), coldGround: new T.Color(0x28121b),
+          warmLight: new T.Color(0xffdcaa), coldLight: new T.Color(0x886b76),
+          warmHalo: new T.Color(0xffd38b), coldHalo: new T.Color(0x8a2337)
+        };
+      }
+
+      makeHearts() {
+        const T = this.T;
+        const shape = new T.Shape();
+        shape.moveTo(0, .35);
+        shape.bezierCurveTo(-.45, .88, -1.12, .54, -.97, -.04);
+        shape.bezierCurveTo(-.86, -.51, 0, -1.01, 0, -1.01);
+        shape.bezierCurveTo(0, -1.01, .86, -.51, .97, -.04);
+        shape.bezierCurveTo(1.12, .54, .45, .88, 0, .35);
+        const geometry = new T.ExtrudeGeometry(shape, { depth: .18, bevelEnabled: true, bevelSize: .14, bevelThickness: .14, bevelSegments: 4, steps: 1, curveSegments: 16 });
+        geometry.center();
+        const palette = ["#eb9e91", "#f3bdac", "#f2d4a7", "#ffe9c7", "#d9867e"];
+        const darkPalette = ["#45232d", "#3f3039", "#453235", "#36313a", "#4e202c"];
+        const materials = palette.map((color, i) => this.material(color, darkPalette[i], { roughness: .37, metalness: .07 }));
+        const count = innerWidth < 650 ? 28 : 46;
+        for (let i = 0; i < count; i++) {
+          const heart = new T.Mesh(geometry, materials[i % materials.length]);
+          const size = .065 + Math.random() * .125 + (i % 11 === 0 ? .11 : 0);
+          heart.scale.setScalar(size);
+          const nx = (Math.random() < .5 ? -1 : 1) * (.27 + Math.random() * .79);
+          const particle = {
+            mesh: heart, nx, ny: Math.random() * 2 - 1, z: -6 + Math.random() * 9,
+            phase: Math.random() * Math.PI * 2, speed: .045 + Math.random() * .07,
+            fall: i % 3 === 0, rotation: (Math.random() - .5) * 1.2
+          };
+          heart.rotation.set((Math.random() - .5) * .7, (Math.random() - .5) * .9, particle.rotation);
+          this.hearts.push(particle);
+          this.scene.add(heart);
+        }
+      }
+
+      makeDust() {
+        const T = this.T;
+        const positions = new Float32Array(145 * 3);
+        for (let i = 0; i < positions.length; i += 3) {
+          positions[i] = (Math.random() - .5) * 28;
+          positions[i + 1] = (Math.random() - .5) * 15;
+          positions[i + 2] = -8 + Math.random() * 13;
+        }
+        const geometry = new T.BufferGeometry();
+        geometry.setAttribute("position", new T.BufferAttribute(positions, 3));
+        this.dust = new T.Points(geometry, new T.PointsMaterial({ color: 0xffefc9, size: .035, map: this.glowMap, transparent: true, opacity: .65, depthWrite: false, blending: T.AdditiveBlending }));
+        this.scene.add(this.dust);
+      }
+
+      resize() {
+        this.camera.aspect = innerWidth / innerHeight;
+        this.camera.fov = innerWidth < 650 ? 44 : 38;
+        this.camera.updateProjectionMatrix();
+        this.renderer.setSize(innerWidth, innerHeight);
+        this.composer.setSize(innerWidth, innerHeight);
+        this.hearts.forEach((particle) => {
+          const depth = 9.5 - particle.z;
+          particle.halfHeight = Math.tan(this.camera.fov * Math.PI / 360) * depth;
+          particle.halfWidth = particle.halfHeight * this.camera.aspect;
+          particle.mesh.position.set(particle.nx * particle.halfWidth, particle.ny * particle.halfHeight, particle.z);
+        });
+      }
+
+      frame(now = performance.now()) {
+        requestAnimationFrame(this.frame);
+        const dt = Math.min((now - this.lastTime) / 1000, .05);
+        this.lastTime = now;
+        if (document.hidden || this.contextLost) return;
+        if (!reducedMotion) this.time += dt;
+        const t = this.time;
+        const d = visual.darkness;
+        this.uniforms.uTime.value = t;
+        this.uniforms.uDark.value = d;
+        this.materials.forEach(({ material, warm, dark }) => material.color.lerpColors(warm, dark, d));
+        this.ambient.color.lerpColors(this.colors.warmSky, this.colors.coldSky, d);
+        this.ambient.groundColor.lerpColors(this.colors.warmGround, this.colors.coldGround, d);
+        this.ambient.intensity = 2.25 - d * 1.83;
+        this.fill.intensity = 1.8 * (1 - d) + .07 * d;
+        this.key.color.lerpColors(this.colors.warmLight, this.colors.coldLight, d);
+        this.key.intensity = (95 - d * 91) * (1 + Math.sin(t * .45) * .035);
+        this.red.intensity = d * (12 + Math.sin(t * .78) * 1.4);
+        this.halo.material.color.lerpColors(this.colors.warmHalo, this.colors.coldHalo, d);
+        this.halo.material.opacity = (.47 - d * .40) * (1 + Math.sin(t * .3) * .06);
+        this.sun.material.emissiveIntensity = 3.2 * (1 - d) + .035 * d;
+        this.bloom.strength = .3 - d * .22;
+        this.dust.material.opacity = .65 - d * .57;
+        this.dust.rotation.y = t * .002;
+        this.camera.position.set(Math.sin(t * .085) * (.035 + d * .07), .5 + Math.cos(t * .065) * .045, 9.5 - visual.cameraPush);
+        this.camera.lookAt(0, .5, -6);
+        this.hearts.forEach((particle) => {
+          const mesh = particle.mesh;
+          if (!reducedMotion) {
+            const darkSpeed = particle.fall ? -particle.speed * .4 : particle.speed * .12;
+            mesh.position.y += (particle.speed * (1 - d) + darkSpeed * d) * dt;
+            if (mesh.position.y > particle.halfHeight + 1) mesh.position.y = -particle.halfHeight - 1;
+            if (mesh.position.y < -particle.halfHeight - 1) mesh.position.y = particle.halfHeight + 1;
+            mesh.position.x = particle.nx * particle.halfWidth + Math.sin(t * .18 + particle.phase) * .12;
+            mesh.rotation.y = Math.sin(t * .16 + particle.phase) * .45;
+            mesh.rotation.x = Math.sin(t * .13 + particle.phase) * .18 + d * .5;
+            mesh.rotation.z = particle.rotation + Math.sin(t * .12 + particle.phase) * .12 + d * (particle.fall ? 1.15 : .2);
+          }
+        });
+        try { this.composer.render(); }
+        catch (_) {
+          this.contextLost = true;
+          this.renderer.domElement.style.opacity = "0";
+          makeFallback();
+        }
+      }
+    }
+
+    function loadGSAP() {
+      if (window.gsap) return Promise.resolve(window.gsap);
+      const sources = [
+        "https://cdn.jsdelivr.net/npm/gsap@3.13.0/dist/gsap.min.js",
+        "https://cdnjs.cloudflare.com/ajax/libs/gsap/3.13.0/gsap.min.js"
+      ];
+      return new Promise((resolve, reject) => {
+        function attempt(index) {
+          if (index >= sources.length) { reject(new Error("Animation library unavailable")); return; }
+          const script = document.createElement("script");
+          let finished = false;
+          const timeout = setTimeout(fail, 9000);
+          function fail() {
+            if (finished) return;
+            finished = true;
+            clearTimeout(timeout);
+            script.remove();
+            attempt(index + 1);
+          }
+          script.onload = () => {
+            if (finished) return;
+            if (!window.gsap) { fail(); return; }
+            finished = true;
+            clearTimeout(timeout);
+            resolve(window.gsap);
+          };
+          script.onerror = fail;
+          script.src = sources[index];
+          document.head.appendChild(script);
+        }
+        attempt(0);
+      });
+    }
+
+    function makeFallback() {
+      if ($("scene").querySelector(".fallback-petal")) return;
+      for (let i = 0; i < 18; i++) {
+        const petal = document.createElement("i");
+        petal.className = "fallback-petal";
+        petal.style.cssText = `--left:${Math.random() * 100}%;--size:${7 + Math.random() * 12}px;--duration:${24 + Math.random() * 20}s;--delay:-${Math.random() * 40}s`;
+        $("scene").appendChild(petal);
+      }
+      $("system-status").textContent = "3D is unavailable on this device. A lighter version of the room is open.";
+    }
+
+    async function prepareRoom() {
+      if (setupPromise) return setupPromise;
+      setupPromise = (async () => {
+        const animationReady = loadGSAP().then((library) => { gsap = library; });
+        if (!sceneReadyPromise) {
+          let loadingTimeout;
+          const dependencies = Promise.all([
+            import("three"),
+            import("three/addons/postprocessing/EffectComposer.js"),
+            import("three/addons/postprocessing/RenderPass.js"),
+            import("three/addons/postprocessing/UnrealBloomPass.js"),
+            import("three/addons/postprocessing/OutputPass.js")
+          ]);
+          const timeout = new Promise((_, reject) => {
+            loadingTimeout = setTimeout(() => reject(new Error("3D loading timed out")), 10000);
+          });
+          sceneReadyPromise = Promise.race([dependencies, timeout]).then(([THREE, { EffectComposer }, { RenderPass }, { UnrealBloomPass }, { OutputPass }]) => {
+            roomScene = new RoomScene(THREE, EffectComposer, RenderPass, UnrealBloomPass, OutputPass);
+          }).catch(() => { $("scene").replaceChildren(); makeFallback(); })
+            .finally(() => clearTimeout(loadingTimeout));
+        }
+        await Promise.all([animationReady, sceneReadyPromise]);
+      })();
+      setupPromise.catch(() => { setupPromise = null; });
+      return setupPromise;
+    }
+
+    function updateAtmosphere() {
+      $("vignette").style.opacity = visual.vignette;
+      $("grain").style.opacity = visual.grain;
+    }
+
+    function scheduleGlitch() {
+      if (reducedMotion) return;
+      clearTimeout(glitchTimer);
+      glitchTimer = setTimeout(() => {
+        if (state.phase === "dark" && !document.hidden) {
+          document.body.classList.add("is-glitching");
+          setTimeout(() => document.body.classList.remove("is-glitching"), 65);
+        }
+        if (state.phase === "dark") scheduleGlitch();
+      }, 7500 + Math.random() * 10000);
+    }
+
+    function finishNote() {
+      state.busy = false;
+      $("enter-button").disabled = state.exhausted;
+      if (state.exhausted) {
+        $("enter-button").classList.add("is-exhausted");
+        $("enter-button").setAttribute("aria-label", "All notes have been heard. The room remains.");
+      }
+    }
+
+    function presentNextNote(first = false) {
+      if (state.busy || state.exhausted) return;
+      const text = drawNote();
+      if (text === null) return;
+      state.busy = true;
+      $("enter-button").disabled = true;
+      const timeline = gsap.timeline({ onComplete: finishNote });
+      if (!first) timeline.to($("dark-note"), { opacity: 0, duration: reducedMotion ? .2 : .35, ease: "power1.in" });
+      timeline.call(() => { $("dark-note").textContent = text; });
+      timeline.fromTo($("dark-note"), { opacity: 0, y: reducedMotion ? 0 : 5 }, { opacity: 1, y: 0, duration: 1.15, ease: "power1.out" });
+    }
+
+    function enterRoom() {
+      if (state.busy || $("enter-button").disabled) return;
+      if (state.phase === "dark") { sound.touch(); presentNextNote(); return; }
+      if (state.phase !== "warm") return;
+      state.phase = "transition";
+      state.busy = true;
+      $("enter-button").disabled = true;
+      $("enter-button").setAttribute("aria-label", "Show another note");
+      gsap.killTweensOf([$("warm-note"), $("welcome-content")]);
+      document.body.classList.add("is-dark");
+      sound.becomeDark(TRANSITION_DURATION);
+      saveProgress();
+
+      const timeline = gsap.timeline({ onComplete: () => {
+        state.phase = "dark";
+        state.busy = false;
+        $("welcome-content").hidden = true;
+        $("warm-note").style.visibility = "hidden";
+        scheduleGlitch();
+        presentNextNote(true);
+      } });
+      timeline.to($("welcome-content"), { opacity: 0, y: reducedMotion ? 0 : -8, duration: TRANSITION_DURATION * .32, ease: "power1.in" }, 0);
+      timeline.to($("warm-note"), { opacity: 0, duration: TRANSITION_DURATION * .25 }, 0);
+      timeline.to(visual, {
+        darkness: 1, cameraPush: reducedMotion ? 0 : .85, vignette: .94, grain: .14,
+        duration: TRANSITION_DURATION, ease: "power2.inOut", onUpdate: updateAtmosphere
+      }, 0);
+      timeline.to($("enter-label"), { opacity: 0, duration: TRANSITION_DURATION * .12 }, TRANSITION_DURATION * .28);
+      timeline.call(() => { $("enter-label").textContent = "again"; }, null, TRANSITION_DURATION * .43);
+      timeline.to($("enter-label"), { opacity: 1, duration: TRANSITION_DURATION * .25 }, TRANSITION_DURATION * .47);
+    }
+
+    $("enter-button").addEventListener("click", enterRoom);
+    document.addEventListener("keydown", (event) => {
+      if (event.key !== "Enter" || event.repeat || !["warm", "dark"].includes(state.phase)) return;
+      if (event.target.closest("#sound-toggle, #retry-button")) return;
+      event.preventDefault();
+      enterRoom();
+    });
+
+    async function revealRoom(returning = false) {
+      $("load-error").hidden = true;
+      $("experience").hidden = false;
+      $("gate-label").hidden = true;
+      $("sound-toggle").hidden = false;
+      document.body.classList.remove("is-quiet");
+      updateSoundButton();
+      sound.start();
+      gsap.to($("scene"), { opacity: 1, duration: 1.7, ease: "power1.inOut" });
+      if (!$("quiet-screen").hidden) gsap.to($("quiet-screen"), { opacity: 0, duration: 1.4, onComplete: () => { $("quiet-screen").hidden = true; } });
+
+      if (returning) {
+        $("welcome-content").hidden = true;
+        $("warm-note").style.visibility = "hidden";
+        $("enter-label").textContent = "again";
+        $("enter-button").setAttribute("aria-label", "Show another note");
+        state.phase = "dark";
+        if (state.lastIndex !== null) {
+          $("dark-note").textContent = notes[state.lastIndex];
+          gsap.set($("dark-note"), { opacity: 1 });
+          finishNote();
+        } else {
+          presentNextNote(true);
+        }
+        scheduleGlitch();
+        await gsap.to($("experience"), { opacity: 1, duration: 1.5 });
+      } else {
+        gsap.fromTo($("welcome-content"), { opacity: 0, y: reducedMotion ? 0 : 9 }, { opacity: 1, y: 0, duration: 1.8, delay: .15, ease: "power1.out" });
+        gsap.to($("warm-note"), { opacity: 1, duration: 1.8, delay: .6, ease: "power1.inOut" });
+        await gsap.to($("experience"), { opacity: 1, duration: 1.7 });
+        state.phase = "warm";
+        $("enter-button").disabled = false;
+        $("enter-button").focus({ preventScroll: true });
+      }
+    }
+
+    async function openPreparedRoom(returning = false) {
+      try {
+        await prepareRoom();
+        await revealRoom(returning);
+      } catch (_) {
+        $("load-error").hidden = false;
+        $("retry-button").disabled = false;
+        $("retry-button").focus({ preventScroll: true });
+      }
+    }
+
+    $("retry-button").addEventListener("click", () => {
+      $("retry-button").disabled = true;
+      openPreparedRoom(state.returning);
+    });
+
+    async function acceptGate() {
+      state.phase = "quiet";
+      $("gate-message").textContent = "Correct.";
+      $("gate-message").className = "is-correct";
+      // Unlock audio in the actual submit gesture, before any awaited animations.
+      sound.unlock().then(updateSoundButton).catch(() => { state.muted = true; updateSoundButton(); });
+      const ready = prepareRoom();
+      ready.catch(() => {});
+      await wait(650);
+      document.body.classList.add("is-quiet");
+      $("quiet-screen").hidden = false;
+      await Promise.all([
+        $("gate").animate([{ opacity: 1 }, { opacity: 0 }], { duration: 800, fill: "forwards" }).finished,
+        $("quiet-screen").animate([{ opacity: 0 }, { opacity: 1 }], { duration: 800, fill: "forwards" }).finished
+      ]);
+      // Release the native fill so GSAP can fade this same surface out later.
+      $("quiet-screen").style.opacity = "1";
+      $("quiet-screen").getAnimations().forEach((animation) => animation.cancel());
+      $("gate").hidden = true;
+      await $("quiet-line").animate([
+        { opacity: 0, offset: 0 }, { opacity: 1, offset: .32 },
+        { opacity: 1, offset: .68 }, { opacity: 0, offset: 1 }
+      ], { duration: 2500, easing: "linear", fill: "forwards" }).finished;
+      state.phase = "loading";
+      openPreparedRoom(false);
+    }
+
+    $("gate-form").addEventListener("submit", (event) => {
+      event.preventDefault();
+      if (state.gateBusy || state.phase !== "gate") return;
+      state.gateBusy = true;
+      state.attempts++;
+      $("password").value = "";
+      $("password").disabled = true;
+      $("gate-submit").disabled = true;
+      $("gate-form").setAttribute("aria-busy", "true");
+
+      if (state.attempts <= GATE_REJECTIONS) {
+        $("gate-message").textContent = state.attempts % 2 ? "Incorrect password." : "Try again.";
+        $("gate-message").className = "is-error";
+        $("password").setAttribute("aria-invalid", "true");
+        $("gate-form").classList.remove("is-rejected");
+        void $("gate-form").offsetWidth;
+        $("gate-form").classList.add("is-rejected");
+        setTimeout(() => { $("password").placeholder = "any password"; }, 150);
+        setTimeout(() => { $("password").placeholder = "Your password"; }, 285);
+        setTimeout(() => {
+          $("gate-form").classList.remove("is-rejected");
+          $("gate-form").setAttribute("aria-busy", "false");
+          $("password").disabled = false;
+          $("gate-submit").disabled = false;
+          state.gateBusy = false;
+          $("password").focus({ preventScroll: true });
+        }, 1050);
+      } else {
+        $("password").removeAttribute("aria-invalid");
+        acceptGate();
+      }
+    });
+
+    document.addEventListener("visibilitychange", () => { sound.setVolume(); updateSoundButton(); });
+    window.addEventListener("pagehide", saveProgress);
+    document.documentElement.style.setProperty("--transition-time", `${TRANSITION_DURATION}s`);
+
+    // Reloading this tab preserves the one-way crossing and the non-repeating tiers.
+    if (restoreProgress()) {
+      state.returning = true;
+      state.muted = true;
+      state.phase = "loading-dark";
+      visual.darkness = 1;
+      visual.cameraPush = reducedMotion ? 0 : .85;
+      visual.vignette = .94;
+      visual.grain = .14;
+      document.body.classList.add("is-dark", "is-resuming");
+      $("gate").hidden = true;
+      $("gate-label").hidden = true;
+      sound.dark = true;
+      updateAtmosphere();
+      openPreparedRoom(true);
+    }
+  </script>
 </body>
 </html>
